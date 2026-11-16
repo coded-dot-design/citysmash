@@ -1696,7 +1696,19 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       return out;
     },
     /** Which hand grips on a wall (the other smashes): the rig's index, for monster k facing f. */
-    gripHand: (k: number, f: number) => (f > 0 ? WALL[k]!.gi : 1 - WALL[k]!.gi),
+    gripHand: (k: number, f: number) => (f > 0 ? 0 : 1),
+    /** Monster k's torso as of the last draw: its centre and which way its front faces, [x, y, z, fx, fy, fz]
+     *  (tests/pose.mjs checks it hugs the building). */
+    torso(k: number) {
+      const M = mons[k]!.tor.M;
+      return [M[9]!, M[10]!, M[11]!, M[0]!, M[3]!, M[6]!];
+    },
+    /** World (x, y, z) to the screen (CSS px of the canvas's backing store) and its depth. */
+    project: (x: number, y: number, z: number) => (dio.project(x, y, z, tmp), [tmp[0]!, tmp[1]!, tmp[2]!]),
+    /** Monster k's rig (tests read its joints). */
+    rig: (k: number) => mons[k]!,
+    /** The wall table (tests tune and check it). */
+    wall: WALL,
     where: (k: number) => (dio.project(MV[k]![0]!, MV[k]![1]! + mons[k]!.height * 0.5, MV[k]![2]!, tmp), [tmp[0]!, tmp[1]!, dio.focal() / tmp[2]!]),
     /** The landing page's poster resolution. */
     poster() {
