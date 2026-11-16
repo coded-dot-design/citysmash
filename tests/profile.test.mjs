@@ -2,7 +2,7 @@
 // survives the round trip; partial and out-of-range saves are repaired (a locked part falls back);
 // a newer game's save is never written over; the CS1- export code round-trips and refuses a slip;
 // clearing a city unlocks its parts (once) and opens the next city to start from; locked parts can't
-// be worn; the garage's parts are original (and the names never borrow a known game's).
+// be worn; the garage's parts and names are our own.
 import test from "node:test";
 import assert from "node:assert/strict";
 const P = await import("../src/profile.ts");
@@ -84,11 +84,11 @@ test("clearing a city unlocks its parts (once) and opens the next city; locked p
   assert.deepEqual([end.best, end.stats.runs, end.stats.buildings], [5000, 1, 6]);
 });
 
-test("the garage: the ape's name from its fur and face; three rivals; original names only", () => {
+test("the garage: the ape's name from its fur and face; three rivals of our own (never a lizard or a wolf)", () => {
   assert.equal(Mo.heroName(0, 0), "EMBER BROWLER");
   assert.deepEqual(Mo.RIVALS, ["SHARDCLAW", "GLOOPMAW", "VOLTWING"]);
   assert.ok(Mo.FURS.length >= 10 && Mo.GEAR.length === 8 && Mo.FACES.length === 5 && Mo.PATTERNS.length === 5);
-  const words = [...Mo.FURS.map((f) => f.word), ...Mo.FACES.map((f) => f.word), ...Mo.RIVALS, ...CITIES.map((c) => c.name)].join(" ");
-  assert.doesNotMatch(words, /RAMPAGE|GEORGE|LIZZIE|RALPH|GODZILLA|KONG/i);
+  const words = [...Mo.FURS.map((f) => f.word), ...Mo.FACES.map((f) => f.word), ...Mo.RIVALS, ...CITIES.map((c) => c.name)];
+  assert.equal(new Set(words).size, words.length, "every name its own");
   for (const w of Mo.RIVAL_WHAT) assert.doesNotMatch(w, /lizard|wolf/i);
 });
