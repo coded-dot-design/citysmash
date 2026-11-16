@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The wall pose turned round (owner feedback): the monster hangs beside the building, seen from the front; the arm by the building grips the side edge at the front corner (hand over hand as it climbs, never letting go), and the other arm swings across into the front face, its fist landing on the very window the round hits (down, level or up) in front of the facade, always in sight. Measured per monster (the ape and the three rivals) and checked on both edges at 1440 and 390 (`tests/pose.mjs`).
+- People at the windows: office workers with ties, ladies with bags, kids in caps, chefs; faces that scream when a monster is near, arms that wave or go up. Snipers and soldiers: helmets, uniforms, rifles, an aim. Comic, no gore.
+- Damage: holes are big jagged dark bites across the window frames (a rim of bare wall, an inner shadow, the floor slab and rebar inside) that merge with the holes beside them into gashes; crisp cracks branch out over the wall; bits and dust fall from the edges. The rules are unchanged (three hits a window, one target, fixed timing, no drift).
+
 ## 0.1.0
 
 - First cut of the full game, grown from the Fizlet gallery daily DOM Kaiju (#124): the same climb-and-smash rules (the inside arm grips and climbs, the outside arm smashes the window by the climb: middle, up or down; three hits a window, a chip, a crack, a hole; one target, fixed timing, no drift), the same tabletop look and camera.

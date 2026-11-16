@@ -15,6 +15,7 @@ import { controls } from "@fzlt/core/input";
 import { pad } from "@fzlt/core/pad";
 import { sound } from "@fzlt/core/sound";
 import { wreckage, type Wreckage } from "./fx.ts";
+import { person, sniper, soldier, cracks, bite, type Ink } from "./paint.ts";
 import { DEPTH, STREET0, STREET1, INTACT, CRACKED, HOLE, SHAKE, FALL, RUBBLE } from "./block.ts";
 import {
   createRun, NM, NS, NP, NCH, NH, NT, SEATS, AI, HERO, CRAB, IN, READY, RUN, CLEAR, DONE, CLIMB, ROOF, KO,
@@ -23,7 +24,7 @@ import {
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
-import { buildMonster, monName, shade, RIVALS, type Look, type Monster, type RigInk } from "./monster.ts";
+import { buildMonster, monName, shade, RIVALS, WALL, type Look, type Monster, type RigInk } from "./monster.ts";
 
 const TAU = 6.283185307179586;
 const mix = (a: string, b: string, k: number) => {
@@ -185,6 +186,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   let sky: CanvasGradient | null = null;
   const STARS = new Float32Array(90), FAR = new Float32Array(64);
   for (let i = 0; i < 90; i++) STARS[i] = rnd();
+  /** The little drawings' colours (./paint.ts), refilled with the palette. */
+  const PI: Ink = { ink: "", paper: "", skin: "", hole: "", slab: "", rebar: "", glow: "", uniform: "", helmet: "", metal: "", tie: "", shirts: [], hair: ["#3a2a20", "#e0b04a", "#1b1420", "#a5532e", "#7a7690"] };
   const INK: RigInk = { ink: "", eye: "", pupil: "", teeth: "", night: true, metal: "" };
 
   function buildScene() {
@@ -312,6 +315,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     }
     dio.decal("ground", 9.8, paintLive);
     // The monsters: the hero (dressed), the rivals.
+    PI.ink = P.ink; PI.paper = P.paper; PI.skin = P.skin; PI.hole = P.hole; PI.slab = light() ? "#b9b2c4" : "#5d5874"; PI.rebar = light() ? "#7a4a3a" : "#c9a07a"; PI.glow = P.fire; PI.uniform = P.soldier; PI.helmet = P.helmet; PI.metal = P.metal; PI.tie = P.antenna; PI.shirts = P.people;
     INK.ink = P.ink; INK.eye = P.eye; INK.pupil = P.pupil; INK.teeth = P.teeth; INK.night = P.night; INK.metal = P.metal;
     for (let k = 0; k < NM; k++) mons.push(buildMonster(dio, k, look, INK, "mon" + k));
     // The helicopters.
@@ -521,7 +525,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         pts.x[k] = g.pos[0]! - w / 2 + col + 0.5;
         pts.y[k] = yo + fl + (fl === 0 ? 0.25 : 0.3);
         pts.z[k] = 0.04;
-        pts.r[k] = 0.27;
+        pts.r[k] = 0.32;
       }
     }
     const surge = run.FE[9]! > 0;
@@ -646,6 +650,17 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         W.dust.puff(x, 0.2, 0.3 + rnd() * 0.6, (rnd() - 0.5) * 2, 0.6 + rnd() * 1.2, 0.6 + rnd(), 1.4, 0.45, 0.55);
         if (st === FALL && rnd() < 0.4) W.chunk.puff(x, run.top(b) - 0.2, 0.2, (rnd() - 0.5) * 3, 2 + rnd() * 2, 1 + rnd(), 1, 0.15, 1);
       }
+    }
+    // Bits and dust fall from the edges of the holes.
+    if (S[0] === RUN && calm) for (let b = 0; b < run.nb(); b++) {
+      const nh = B[b * 6 + 1]!;
+      if (!nh || B[b * 6]! >= FALL || rnd() > dt * Math.min(8, nh) * 0.9) continue;
+      const w = BLD[b * 4 + 1]!, f = BLD[b * 4 + 2]!, fl = (rnd() * f) | 0, col = (rnd() * w) | 0;
+      if (!holeAt(b, col, fl)) continue;
+      const x = BLD[b * 4]! + col + 0.2 + rnd() * 0.6, y = run.yOff(b) + fl + 0.1;
+      W.chunk.P.colorAll = P.walls[BLD[b * 4 + 3]!]!;
+      W.chunk.puff(x, y, 0.15, (rnd() - 0.5) * 0.6, -0.2, 0.3 + rnd() * 0.4, 1.2, 0.06 + rnd() * 0.06, 1);
+      W.dust.puff(x, y, 0.2, (rnd() - 0.5) * 0.3, -0.3, 0.2, 1.1, 0.16, 0.45);
     }
     // Live parts spark now and then (the warning); the cooling tower steams.
     if (S[0] === RUN && liveCell.length && rnd() < dt * (run.FE[9]! > 0 ? 40 : 9)) {
@@ -1171,78 +1186,58 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     ctx.fill();
     ctx.stroke();
   }
+  /** Is window (col, fl) of building b a hole (and still up)? */
+  function holeAt(b: number, col: number, fl: number) {
+    const w = run.BLD[b * 4 + 1]!;
+    return col >= 0 && col < w && fl >= run.B[b * 6 + 3]! && fl < run.BLD[b * 4 + 2]! && run.cell[run.C0[b]! + fl * w + col] === HOLE;
+  }
+  /** The damage on building b's facade: first the cracks (crisp branches out over the wall panels, longer
+   *  with each hit), then the bites: a chip, a crack (a small dark dent), a hole (a big jagged bite across
+   *  the window frame, its rim of bare wall, the floor slab and rebar inside; next to another hole it
+   *  stretches into it, so holes merge into gashes down and across the face). */
   function paintHoles(b: number) {
     return (ctx: CanvasRenderingContext2D) => {
-      const BLD = run.BLD, w = BLD[b * 4 + 1]!, f = BLD[b * 4 + 2]!, rem = run.B[b * 6 + 3]!, g = groups[b]!, yo = run.yOff(b), fc = dio.focal();
+      const BLD = run.BLD, C0 = run.C0, w = BLD[b * 4 + 1]!, f = BLD[b * 4 + 2]!, rem = run.B[b * 6 + 3]!, g = groups[b]!, yo = run.yOff(b), fc = dio.focal();
       if (run.B[b * 6] === RUBBLE) return;
-      for (let fl = rem; fl < f; fl++) for (let col = 0; col < w; col++) {
-        const i = run.C0[b]! + fl * w + col, cs = run.cell[i]!;
-        if ((cs === INTACT && !run.HIT[i]) || run.LIVE[i]) continue;
+      for (let pass = 0; pass < 2; pass++) for (let fl = rem; fl < f; fl++) for (let col = 0; col < w; col++) {
+        const i = C0[b]! + fl * w + col, cs = run.cell[i]!, hh = run.HIT[i]!;
+        if ((cs === INTACT && !hh) || run.LIVE[i]) continue;
         const x = g.pos[0]! - w / 2 + col + 0.5, y = yo + fl + (fl === 0 ? 0.45 : 0.5);
         if (!at(x, y, 0.06)) continue;
-        const s = fc / tmp[2]!, cx = tmp[0]!, cy = tmp[1]!, seed = (i * 7919) % 97;
+        const s = fc / tmp[2]!, cx = tmp[0]!, cy = tmp[1]!, lw = Math.max(1, s * 0.03);
+        if (pass === 0) {
+          // Cracks: a chip's few short ones, a crack's longer net, a hole's long branches.
+          const lv = cs === HOLE ? 3 : hh;
+          cracks(ctx, cx, cy, s * (0.35 + 0.3 * lv), 2 + lv * 2, i, PI, lw);
+          continue;
+        }
         if (cs === HOLE) {
-          const pop = 1 + run.crackT[i]! * 1.2;
-          ctx.fillStyle = P.hole;
-          ctx.strokeStyle = P.night ? P.holeRim : P.ink;
-          ctx.lineWidth = Math.max(1, s * 0.035);
-          ctx.beginPath();
-          for (let k = 0; k < 10; k++) {
-            const a = (k / 10) * TAU + seed * 0.05, rr = (k & 1 ? 0.17 : 0.3 + ((seed + k * 13) % 7) * 0.015) * s * pop;
-            const px = cx + Math.cos(a) * rr * 1.05, py = cy + Math.sin(a) * rr * 0.95;
-            k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-          }
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-          // Cracks run out from the hole across the wall.
-          ctx.strokeStyle = P.ink;
-          ctx.lineWidth = Math.max(1, s * 0.03);
-          ctx.globalAlpha = 0.8;
-          ctx.beginPath();
-          for (let k = 0; k < 6; k++) {
-            const a = k * 1.05 + seed * 0.3, r1 = s * 0.3, r2 = s * (0.9 + ((seed + k * 3) % 4) * 0.12), m = a + (((seed + k) % 3) - 1) * 0.25;
-            ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-            ctx.lineTo(cx + Math.cos(m) * (r1 + r2) * 0.5, cy + Math.sin(m) * (r1 + r2) * 0.5);
-            ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
-          }
-          ctx.stroke();
-          ctx.globalAlpha = 1;
+          const pop = 1 + run.crackT[i]! * 0.8;
+          const L = holeAt(b, col - 1, fl) ? 1.75 : 1, Rr = holeAt(b, col + 1, fl) ? 1.75 : 1, U = holeAt(b, col, fl + 1) ? 1.85 : 1, D = holeAt(b, col, fl - 1) ? 1.85 : 1;
+          bite(ctx, cx, cy, s * 0.5 * pop, L, Rr, U, D, i, SCAR[b]!, PI, lw * 1.2, cy + s * 0.42);
           if (run.crackT[i]! > 0) {
             ctx.globalAlpha = run.crackT[i]! * 2;
             ctx.fillStyle = P.fire;
             ctx.beginPath();
-            ctx.arc(cx, cy, s * 0.14, 0, TAU);
+            ctx.arc(cx, cy, s * 0.2, 0, TAU);
             ctx.fill();
             ctx.globalAlpha = 1;
           }
-        } else {
-          const heavy = cs === CRACKED, hh = run.HIT[i]!;
-          ctx.strokeStyle = P.ink;
-          ctx.lineWidth = Math.max(1, s * (heavy ? 0.03 : 0.02));
-          ctx.globalAlpha = heavy ? 0.85 : 0.6;
-          ctx.beginPath();
-          for (let k = 0; k < (heavy ? 8 : 5); k++) {
-            const a = k * 1.7 + seed, rr = s * (0.32 + 0.3 * hh) * (0.7 + ((seed + k * 5) % 4) * 0.12);
-            ctx.moveTo(cx - s * 0.05, cy - s * 0.04);
-            ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.9);
-          }
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
+        } else if (cs === CRACKED) bite(ctx, cx + s * 0.05, cy - s * 0.03, s * 0.24, 1, 1, 1, 1, i, SCAR[b]!, PI, lw, cy + s * 0.5);
       }
     };
   }
-  /** A person at a window (waving; panicking with both arms up when a monster is near), a sniper, or a hot pot. */
+  /** A person at a window (waving; screaming with both arms up when a monster is near), a sniper, or a hot pot. */
   function paintFolk(ctx: CanvasRenderingContext2D, k: number, p: DioramaPoints) {
     let b = 0;
     while (folk[b] !== p) b++;
     const i = run.C0[b]! + k, kind = run.occ[i]!, x = p.sx[k]!, y = p.sy[k]!, r = p.sr[k]!;
     if (r < 1.5) return;
-    const t = engine.time * 6 + k, lw = Math.max(1, r * 0.12);
-    ctx.lineWidth = lw;
-    ctx.strokeStyle = P.ink;
+    const t = engine.time * 6 + k;
     if (kind === 3) {
+      // A pot on a stove, glowing hot, steam over it.
+      ctx.lineWidth = Math.max(1, r * 0.12);
+      ctx.strokeStyle = P.ink;
       ctx.fillStyle = P.fire;
       ctx.globalAlpha = 0.35 + 0.2 * Math.sin(t * 2);
       ctx.beginPath();
@@ -1253,10 +1248,6 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       ctx.beginPath();
       ctx.roundRect(x - r * 0.55, y - r * 0.15, r * 1.1, r * 0.75, r * 0.15);
       ctx.fill();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x - r * 0.75, y);
-      ctx.lineTo(x + r * 0.75, y);
       ctx.stroke();
       ctx.strokeStyle = P.paper;
       ctx.globalAlpha = 0.8;
@@ -1270,82 +1261,16 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       ctx.globalAlpha = 1;
       return;
     }
-    let panic = false;
-    for (let m = 0; m < NM; m++) if (MV[m]![24] === IN && Math.abs(MV[m]![0]! - p.x[k]!) < 3.2) panic = true;
-    const jx = panic ? Math.sin(t * 5) * r * 0.08 : 0;
-    ctx.fillStyle = kind === 2 ? P.soldier : P.people[(i * 5) % 6]!;
-    ctx.beginPath();
-    ctx.roundRect(x + jx - r * 0.55, y + r * 0.15, r * 1.1, r * 0.75, r * 0.25);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = P.skin;
-    ctx.beginPath();
-    ctx.arc(x + jx, y - r * 0.1, r * 0.38, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
-    if (kind === 2) {
-      ctx.fillStyle = P.helmet;
-      ctx.beginPath();
-      ctx.arc(x, y - r * 0.18, r * 0.42, Math.PI, TAU);
-      ctx.fill();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x + r * 0.45, y + r * 0.2);
-      ctx.lineTo(x + r * 0.7, y - r * 0.55);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      const wv = Math.sin(t) * r * 0.25;
-      ctx.moveTo(x + jx - r * 0.45, y + r * 0.25);
-      ctx.lineTo(x + jx - r * 0.75 + wv, y - r * 0.6);
-      if (panic) ctx.moveTo(x + jx + r * 0.45, y + r * 0.25), ctx.lineTo(x + jx + r * 0.75 - wv, y - r * 0.6);
-      ctx.stroke();
-      ctx.fillStyle = P.ink;
-      ctx.beginPath();
-      ctx.arc(x + jx, y + r * 0.02, r * (panic ? 0.13 : 0.09), 0, TAU);
-      ctx.fill();
-    }
-    ctx.fillStyle = P.ink;
-    ctx.fillRect(x + jx - r * 0.17, y - r * 0.2, lw, lw);
-    ctx.fillRect(x + jx + r * 0.12, y - r * 0.2, lw, lw);
+    let panic = false, near = 0;
+    for (let m = 0; m < NM; m++) if (MV[m]![24] === IN && Math.abs(MV[m]![0]! - p.x[k]!) < 3.2) (panic = true), (near = MV[m]![0]! - p.x[k]!);
+    if (kind === 2) return sniper(ctx, x, y, r, near > 0 ? 1 : near < 0 ? -1 : (k & 1 ? 1 : -1), PI, t);
+    person(ctx, x, y, r, (i * 7 + (i >> 2)) & 3, i, PI, t, panic);
   }
   function paintSoldier(ctx: CanvasRenderingContext2D, s: number, p: DioramaPoints) {
-    const x = p.sx[s]!, y = p.sy[s]!, r = p.sr[s]!, o = s * 8, dir = run.SO[o + 3]!, aim = run.SO[o + 4]!, st = Math.sin(run.SO[o + 7]!) * (aim ? 0 : 1);
+    const x = p.sx[s]!, y = p.sy[s]!, r = p.sr[s]!, o = s * 8;
     if (r < 1.5) return;
-    const lw = Math.max(1, r * 0.13);
-    ctx.lineWidth = lw * 1.6;
-    ctx.strokeStyle = P.ink;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(x, y + r * 0.3);
-    ctx.lineTo(x - r * 0.25 + st * r * 0.25, y + r);
-    ctx.moveTo(x, y + r * 0.3);
-    ctx.lineTo(x + r * 0.25 - st * r * 0.25, y + r);
-    ctx.stroke();
-    ctx.lineWidth = lw;
-    ctx.fillStyle = P.soldier;
-    ctx.beginPath();
-    ctx.roundRect(x - r * 0.32, y - r * 0.45, r * 0.64, r * 0.85, r * 0.15);
-    ctx.fill();
-    ctx.stroke();
-    const wind = aim ? Math.max(0, 1 - run.SO[o + 5]! * 2) : 0;
-    ctx.lineWidth = lw * 1.4;
-    ctx.beginPath();
-    ctx.moveTo(x + dir * r * 0.2, y - r * 0.3);
-    ctx.lineTo(x + dir * r * (0.5 - wind * 0.9), y - r * (0.5 + wind * 0.4));
-    ctx.stroke();
-    ctx.lineWidth = lw;
-    ctx.fillStyle = P.skin;
-    ctx.beginPath();
-    ctx.arc(x, y - r * 0.68, r * 0.27, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = P.helmet;
-    ctx.beginPath();
-    ctx.arc(x, y - r * 0.74, r * 0.32, Math.PI, TAU);
-    ctx.fill();
-    ctx.stroke();
-    ctx.lineCap = "butt";
+    const aim = run.SO[o + 4]!, kick = aim ? Math.max(0, run.SO[o + 5]! - 2.2) * 4 : 0;
+    soldier(ctx, x, y, r, run.SO[o + 3]!, aim, run.SO[o + 7]!, Math.min(1, kick), PI);
   }
   function paintPebble(ctx: CanvasRenderingContext2D, k: number, p: DioramaPoints) {
     const x = p.sx[k]!, y = p.sy[k]!, r = Math.max(1.5, p.sr[k]!), kind = run.PB[k * 8 + 7]!;
@@ -1760,6 +1685,18 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       V[1] = 1;
       engine.wake();
     },
+    /** Where monster k's hands (in rig order), then its feet, are in the
+     *  world as of the last draw, by their centres: [x, y, z, …] (tests/pose.mjs checks the grip and the hit). */
+    contacts(k: number) {
+      const m = mons[k]!, out: number[] = [];
+      for (const o of [...m.hands, ...m.feet]) {
+        const M = o.M, h = o.size[1]! / 2;
+        out.push(M[9]! + M[1]! * h, M[10]! + M[4]! * h, M[11]! + M[7]! * h);
+      }
+      return out;
+    },
+    /** Which hand grips on a wall (the other smashes): the rig's index, for monster k facing f. */
+    gripHand: (k: number, f: number) => (f > 0 ? WALL[k]!.gi : 1 - WALL[k]!.gi),
     where: (k: number) => (dio.project(MV[k]![0]!, MV[k]![1]! + mons[k]!.height * 0.5, MV[k]![2]!, tmp), [tmp[0]!, tmp[1]!, dio.focal() / tmp[2]!]),
     /** The landing page's poster resolution. */
     poster() {

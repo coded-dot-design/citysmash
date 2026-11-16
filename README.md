@@ -29,10 +29,10 @@ npm ci
 npm run check          # typecheck, build dist/, size budget
 npm test               # headless: the rules, every city, progression, determinism, the profile, rollback sync, zero allocation
 npm run test:settle    # it sleeps when nothing moves
-npm run test:browser   # start, the garage, climb and punch, eat, a building falls, city 2, 2P, the phone pad; online rooms
+npm run test:browser   # start, the garage, climb and punch, eat, a building falls, city 2, 2P, the phone pad; the wall pose; online rooms
 npm run site:build && npm run test:site
 ```
 
-Source: `src/block.ts` (the destructible buildings), `src/climber.ts` (the wall climber), `src/round.ts` (the run, headless: monsters, army, features, cities), `src/cities.ts` (the seven cities), `src/monster.ts` (the rigs), `src/fx.ts` (the particle kit), `src/scene.ts` (a city on screen), `src/profile.ts` (the save), `src/net.ts` and `src/rollback.ts` (online), `src/game.ts` (title, garage, rooms).
+Source: `src/block.ts` (the destructible buildings), `src/climber.ts` (the wall climber), `src/round.ts` (the run, headless: monsters, army, features, cities), `src/cities.ts` (the seven cities), `src/monster.ts` (the rigs), `src/fx.ts` (the particle kit), `src/paint.ts` (the people, the soldiers, the cracks and holes), `src/scene.ts` (a city on screen), `src/profile.ts` (the save), `src/net.ts` and `src/rollback.ts` (online), `src/game.ts` (title, garage, rooms).
 
 MIT © Chris Cooley.
