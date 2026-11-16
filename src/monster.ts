@@ -73,6 +73,8 @@ export interface RigInk { ink: string; eye: string; pupil: string; teeth: string
  *  close, medium, far, up close, medium, down close, medium; [swing, splay, elbow] each), the head's turn.
  *  Fitted per kind (tests/pose.mjs checks them). */
 export interface Wall { yaw: number; ox: number; oz: number; lean: number; lunge: number; come: number[]; far: number[]; fleg: number[]; nleg: number[]; rest: number[]; wind: number[]; hit: number[]; neck: number }
+/** The depth (z) the scene anchors a held building's cluster at: behind it only the rigs on its walls. */
+export const HELD = 0.05;
 export const WALL: Wall[] = [
   // the ape
   { yaw: 0.1, ox: -0.15, oz: -0.85, lunge: 1, lean: 0.15, come: [2, 0.2, 0.2], far: [1.105, -0.541, 2.107], fleg: [0.871, -0.25, -0.006], nleg: [1.033, -0.25, 0.353], rest: [-0.759, -0.108, 1.792], wind: [3.636, -1.51, 2.7, 2.593, 1.631, 2.7, -1.65, 2.67, 1.5, 2.253, 0.442, 2.548, 2.253, 0.442, 2.548, 3.7, -0.421, 2.627, 3.7, -0.421, 2.627], hit: [-0.039, -0.862, 1.586, 1.009, -0.847, 0, 1.412, -2.024, 0.81, 1.241, 1.407, 1.679, 1.017, -1.615, 0.242, 0.047, -0.489, 0.919, 0.816, -0.443, 0], neck: -1.2 },
@@ -441,14 +443,16 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     // building, far side, body, near side, in that order; the smashing arm comes in front once its fist is
     // out (the hit frame through the recovery, the grab; the far swing's wind-up with the body), then goes back.
     const rx = root.pos[0]!, rz = root.pos[2]!, c = Math.cos(yaw), sn = Math.sin(yaw);
-    atB[0] = rx; atB[2] = wall ? (lk > (M[34]! > 0 ? 0.3 : 0.6) ? rz + 2 : -DEPTH - 1) : rz;
+    // (On a wall the rig sorts just in front of every building but the one it holds, which the scene sorts at
+    // HELD, just in front of the rig: the facade it holds covers it, a neighbour never does.)
+    atB[0] = rx; atB[2] = wall ? (lk > (M[34]! > 0 ? 0.3 : 0.6) ? rz + 2 : -DEPTH + 0.02) : rz;
     for (let q = 0; q < 4; q++) {
       const A = at4[q]!, s = q & 1 ? 1 : -1, leg = q > 1;
       A[1] = 0;
       if (wall) {
         const isFar = (q & 1) === far, fist = !leg && !isFar && ((punching && (M[34]! <= 0 || lk > 0.3)) || (ga > 0 && zap <= 0));
         A[0] = rx;
-        A[2] = fist ? rz + 2.5 : -DEPTH - 1 + (isFar ? -0.6 : 0.5);
+        A[2] = fist ? rz + 2.5 : -DEPTH + 0.02 + (isFar ? -0.01 : 0.01);
       } else {
         const l = s * (leg ? 0.45 : 0.8) * MK, fw = leg ? 0 : 0.35 * MK;
         A[0] = rx + fw * c + l * sn;

@@ -222,6 +222,86 @@ test("the grab's reach: people, soldiers and food in the 12 cells round it on ev
   assert.ok(heli(-1).some((e) => e[0] === R.E_HELI), "a chopper next to it: swatted");
 });
 
+test("on the building he holds, if he can punch a window he can grab what's in it: the 7 punch cells (the far one too); 4 in is too far; off the building the 12 stay; helicopters next to him only", () => {
+  assert.equal(R.GRAB_WALL.length, R.NGW * 2, "one wall table");
+  for (let c = 0; c < R.NR; c++) assert.deepEqual([R.GRAB_WALL[c * 2], R.GRAB_WALL[c * 2 + 1]], [R.REACH[c * 2 + 1], R.REACH[c * 2]], `grab cell ${c} is reach cell ${c}`);
+  for (let g = R.NR; g < R.NGW; g++) assert.ok(R.GRAB_WALL[g * 2] <= 0, `wall grab cell ${g} is off the building`);
+  assert.equal(R.NGW - R.NR, 8, "GRAB's 8 off-building cells on a wall");
+  const run = quiet(), M = run.M, b = 3;
+  run.LIVE.fill(0);
+  hangAt(run, M, b, -1, 2);
+  play(run, 10);
+  const grab = (t) => play(run, 30, (I, f) => ((I[4] = f === 0 ? 1 : 0), (I[5] = f === 0 ? t : 0)));
+  const noms = (ev) => ev.filter((e) => e[0] === R.E_NOM).length;
+  // Every reach cell: someone there is eaten by a grab at that cell (the far punch's, three in, included).
+  for (let c = 0; c < R.NR; c++) {
+    const i = run.reachCell(M, c);
+    run.occ[i] = 1;
+    assert.equal(noms(grab(R.T_GRAB + c)), 1, `reach cell ${c} (${R.REACH[c * 2]} up, ${R.REACH[c * 2 + 1]} in): eaten`);
+    assert.equal(run.occ[i], 0);
+  }
+  // Four in (past the far punch): out of reach, a whiff (the scene shows TOO FAR), nobody eaten.
+  const far = cellOf(run, b, 2, 3);
+  run.occ[far] = 1;
+  assert.ok(!run.inGrab(M, run.BLD[b * 4] + 3.5, run.yOff(b) + 2.5), "4 in is not in the grab's reach");
+  assert.ok(run.inGrab(M, run.BLD[b * 4] + 2.5, run.yOff(b) + 2.5), "3 in (the far punch) is");
+  // The scene's tap there is T_MISS; a grab code past the table is a miss too.
+  const m = grab(R.T_GRAB + R.NGW);
+  assert.ok(m.some((e) => e[0] === R.E_WHIFF) && noms(m) === 0 && run.occ[far] === 1, "too far: a whiff");
+  // The untargeted grab (a key, the gamepad, the AI) takes from the same 7.
+  run.occ.fill(0);
+  run.occ[run.reachCell(M, 2)] = 1;
+  assert.equal(noms(play(run, 30, (I, f) => (I[4] = f === 0 ? 1 : 0))), 1, "the gamepad's grab reaches the far cell");
+  // Off a wall: the 12-cell table, unchanged.
+  M[5] = WALK; M[1] = 0; M[2] = 1.9;
+  assert.equal(run.grabCount(M), R.NG, "off a wall: 12");
+  hangAt(run, M, b, -1, 2);
+  assert.equal(run.grabCount(M), R.NGW, "on a wall: 15");
+  // Helicopters: only the 8 round him.
+  const lv = run.yOff(b) + 2 + 0.5, me = run.BLD[b * 4] - 0.5;
+  assert.ok(run.inGrab(M, me - 1, lv, true) && !run.inGrab(M, me - 2, lv, true), "a chopper: next to him only");
+});
+
+test("the combo: fast, accurate taps speed the punch up (x1 -> x1.25 -> x1.5 -> x1.6); a whiff or a pause drops it; ten taps out of reach give nothing; the AI only to x1.25", () => {
+  const run = quiet(), M = run.M, b = 3;
+  run.LIVE.fill(0);
+  hangAt(run, M, b, -1, 2);
+  play(run, 10);
+  // (The windows mend each frame: a hole is no target, so the chain stays on fresh glass.)
+  const tap = (t) => (I, f) => { run.cell.fill(INTACT); run.HIT.fill(0); run.B.fill(0); if (f % 4 === 0) (I[2] = 1), (I[5] = t); };
+  // A chain of taps in reach, one as soon as it can: the combo climbs to its top.
+  const seen = new Set();
+  play(run, 120, (I, f) => { tap(R.T_CELL + 1)(I, f); seen.add(M[46]); });
+  assert.deepEqual([...seen].filter((v) => v > 1).sort(), [1.25, 1.5, 1.6], "the ladder");
+  assert.equal(M[46], 1.6);
+  // Faster: punches in the same second at the top of the combo vs none.
+  const count = (ev) => ev.filter((e) => e[0] === R.E_PUNCH).length;
+  const fast = count(play(run, 60, tap(R.T_CELL + 2)));
+  // A pause: dropped.
+  play(run, 60);
+  assert.equal(M[46], 1, "a pause drops it");
+  const slow = count(play(run, 60, (I, f) => { tap(R.T_CELL + 2)(I, f); M[46] = 1; }));
+  assert.ok(fast > slow, `faster at the top: ${fast} punches a second vs ${slow}`);
+  // A whiff drops it.
+  play(run, 60, tap(R.T_CELL + 1));
+  assert.ok(M[46] > 1);
+  let wf = -1;
+  for (let f = 0; f < 30 && wf < 0; f++) if (play(run, 1, (I) => { if (f === 0) (I[2] = 1), (I[5] = R.T_MISS); }).some((e) => e[0] === R.E_WHIFF)) wf = f;
+  assert.ok(wf >= 0 && wf < 0.6 * 60, `the whiff (frame ${wf}, before any pause counts)`);
+  assert.equal(M[46], 1, "a whiff drops it");
+  // Spam out of reach: ten taps, no speed.
+  play(run, 60);
+  play(run, 60, (I, f) => { if (f % 6 === 0) (I[2] = 1), (I[5] = R.T_MISS); });
+  assert.equal(M[46], 1, "ten taps out of reach: x1");
+  // The AI: at most x1.25.
+  const ai = R.createRun(5);
+  ai.reset(5, 0, 1);
+  ai.S[0] = RUN;
+  let top = 0;
+  play(ai, 60 * 40, (I) => { for (let k = 1; k < R.NM; k++) top = Math.max(top, ai.MV[k][46]); });
+  assert.ok(top <= 1.25, `the AI tops out at x${top}`);
+});
+
 test("spam does not pay: ten rapid taps on one window land no more than the fixed timing allows; a whiff costs a recovery", () => {
   const run = quiet(), M = run.M, b = 3;
   run.LIVE.fill(0);

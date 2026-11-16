@@ -25,7 +25,7 @@ import {
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
-import { buildMonster, monName, shade, RIVALS, WALL, TRIMS, type Look, type Monster, type RigInk } from "./monster.ts";
+import { buildMonster, monName, shade, RIVALS, WALL, TRIMS, HELD, type Look, type Monster, type RigInk } from "./monster.ts";
 
 const TAU = 6.283185307179586;
 /** Practice's steps, in ./round.ts P_* order. */
@@ -43,6 +43,7 @@ const BASE_D = {
   heli: "#5d6b4a", heli2: "#3e4a32", glass: "#7cf6ff", rotor: "#1a1a26", army: "#55613e", army2: "#3b442b", wreck: "#2a2630",
   box: "#5b5f78", hazard: "#ffd23f", neon: "#ff4fa8", zap: "#fff36b", water: "#13234a", water2: "#22e6ff", rail: "#8a84b8", train: "#c43d4b", train2: "#3b3466", truck: "#ffb03a", truck2: "#2c3f6a",
   soldier: "#7d8b52", helmet: "#4e5a30", skin: "#e8b48f", people: ["#ff8fb8", "#6fd3ff", "#ffd166", "#7ee0a8", "#c0c6ff", "#ff9e6b"], chute: ["#ff4fa8", "#ffffff", "#22e6ff", "#ffd166"],
+  pickHit: "#39ffb0", pickGrab: "#22e6ff", pickFar: "#ff2e55",
   pebble: "#ffe066", shell: "#ff8a1f", dust: "#8a84b8", shard: "#bff6ff", smoke: "#a39fc4", spark: "#ffd166", fire: "#ff6a2a", shadow: "#000000",
   ink: "#0b0a14", paper: "#f6f3ff", eye: "#fff6c9", pupil: "#0b0a14", teeth: "#f6f3ff", metal: "#9aa3c8",
 };
@@ -54,6 +55,7 @@ const BASE_L: typeof BASE_D = {
   heli: "#6f8a5a", heli2: "#4f6642", glass: "#cfe8ff", rotor: "#2a2a33", army: "#6f8a4a", army2: "#4f6634", wreck: "#4a4048",
   box: "#8d93ab", hazard: "#ffb703", neon: "#ef476f", zap: "#ffe14d", water: "#5aa9e6", water2: "#e8f6ff", rail: "#7b8094", train: "#d9434f", train2: "#5a5480", truck: "#ff9f1c", truck2: "#3a5a9a",
   soldier: "#6f8a4a", helmet: "#4f6634", chute: ["#ef476f", "#ffffff", "#118ab2", "#ffd166"],
+  pickHit: "#06a77d", pickGrab: "#118ab2", pickFar: "#e63946",
   pebble: "#ff9f1c", shell: "#e85d04", dust: "#d9d2c3", shard: "#ffffff", smoke: "#eeeeee", spark: "#ffb703", fire: "#ff5a1f", shadow: "#3a2a24",
   ink: "#1b1420", paper: "#ffffff", eye: "#ffffff", pupil: "#1b1420", teeth: "#ffffff", metal: "#b8bfd8",
 };
@@ -182,6 +184,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   let tank: DioramaObject, turret: DioramaObject, train: DioramaObject | null = null, xing: DioramaObject[] = [], beam: DioramaObject | null = null, steam = 0;
   let bits: DioramaPoints, soldiers: DioramaPoints, pebbles: DioramaPoints, chutes: DioramaPoints, runners: DioramaPoints, W: Wreckage;
   const folk: DioramaPoints[] = [];
+  const twins: (() => void)[] = [];
+  /** Each building's cluster anchor (its back face): the one a monster holds comes forward to HELD (./monster.ts). */
+  const BAT: Float64Array[] = [];
   const rnd = engine.random;
   let sky: CanvasGradient | null = null;
   const STARS = new Float32Array(90), FAR = new Float32Array(64);
@@ -244,13 +249,23 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     const [ww, wh] = cty.win;
     for (let b = 0; b < nb; b++) {
       const x0 = BLD[b * 4]!, w = BLD[b * 4 + 1]!, f = BLD[b * 4 + 2]!, lk = BLD[b * 4 + 3]!, id = "bg" + b, cl = "b" + b, mark = lk === 5;
-      dio.cluster(cl, { at: [x0 + w / 2, 0, -DEPTH] });
+      // The side walls are their own cluster, sorted behind every building's front and behind every rig on a
+      // wall: a monster in the gap draws over the side wall it hangs on and the one across the gap, at any
+      // camera; only the front of the building it holds covers it (./monster.ts HELD).
+      dio.cluster(cl + "s", { at: [x0 + w / 2, 0, -DEPTH - 0.01] });
+      dio.cluster(cl, { at: (BAT[b] = new Float64Array([x0 + w / 2, 0, -DEPTH])) });
+      /** The two side faces of a box w wide at `pos` on `on` (h tall, d deep), in the side walls' cluster. */
+      const sides = (on: string, wd: number, h: number, d: number, y: number, col: string, layer: number) => {
+        for (const sd of [-1, 1]) dio.add({ size: [0.002, h, d], pos: [sd * (wd / 2 - 0.001), y, 0], on, color: col, cluster: cl + "s", layer, mask: sd < 0 ? 8 : 4, pick: false });
+      };
       groups.push(dio.add({ id, shape: "group", size: [w, 0, DEPTH], pos: [x0 + w / 2, 0, -DEPTH / 2], cluster: cl, pick: false }));
       const fs: DioramaObject[] = [];
       for (let fl = 0; fl < f; fl++) {
         const fid = id + "f" + fl;
-        fs.push(dio.add({ id: fid, size: [w, 1, DEPTH], pos: [0, fl, 0], on: id, color: P.walls[lk]!, pick: false, layer: 5 }));
-        dio.add({ size: [w + 0.12, mark ? 0.14 : 0.09, DEPTH + 0.12], pos: [0, -0.09, 0], on: fid, color: P.ledge[lk]!, pick: false, layer: 6 });
+        fs.push(dio.add({ id: fid, size: [w, 1, DEPTH], pos: [0, fl, 0], on: id, color: P.walls[lk]!, pick: false, layer: 5, mask: 51 }));
+        sides(fid, w, 1, DEPTH, -1, P.walls[lk]!, 5);
+        dio.add({ size: [w + 0.12, mark ? 0.14 : 0.09, DEPTH + 0.12], pos: [0, -0.09, 0], on: fid, color: P.ledge[lk]!, pick: false, layer: 6, mask: 51 });
+        sides(fid, w + 0.12, mark ? 0.14 : 0.09, DEPTH + 0.12, -0.09, P.ledge[lk]!, 6);
         for (let col = 0; col < w; col++) {
           const i = C0[b]! + fl * w + col, gf = fl === 0, door = gf && col === ((w / 2) | 0);
           if (door) dio.add({ size: [0.5, 0.78, 0.05], pos: [col - w / 2 + 0.5, -1, DEPTH / 2 + 0.01], on: fid, color: P.door, pick: false, layer: 7 });
@@ -262,7 +277,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       // The roof: a parapet, its furniture (a live antenna where the round says), a vent; the landmark's crown.
       const rid = id + "r";
       roofs.push(dio.add({ id: rid, shape: "group", size: [w, 0, DEPTH], pos: [0, f, 0], on: id, pick: false }));
-      dio.add({ size: [w + 0.16, 0.22, DEPTH + 0.16], pos: [0, 0, 0], on: rid, color: P.roof, pick: false, layer: 6 });
+      dio.add({ size: [w + 0.16, 0.22, DEPTH + 0.16], pos: [0, 0, 0], on: rid, color: P.roof, pick: false, layer: 6, mask: 51 });
+      sides(rid, w + 0.16, 0.22, DEPTH + 0.16, 0, P.roof, 6);
       const R = (s: number[], p: number[], col: string, o: { shape?: "box" | "cyl" | "wedge" | "prism"; sides?: number; top?: number; emissive?: boolean; rot?: number[] } = {}) =>
         dio.add({ shape: o.shape ?? "box", sides: o.sides, top: o.top, size: s, pos: p, rot: o.rot, on: rid, color: col, emissive: o.emissive, pick: false, layer: 7 });
       if (mark) crown(cty, R, w, f);
@@ -381,6 +397,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     LEAN.fill(0);
     FLASH[3] = 0;
     W = wreckage(dio, { dust: P.dust, smoke: P.smoke, chunk: P.rubble[1]!, shard: P.shard, spark: P.spark });
+    dio.cluster("fxBack", { at: [0, 0, -DEPTH + 0.1] });
+    twins.length = 0;
+    for (const p of [soldiers, chutes, pebbles, bits, W.dust.P, W.smoke.P, W.chunk.P, W.shard.P, W.spark.P]) twin(p);
     sky = null;
     hudDirty = true;
     pose(0);
@@ -524,6 +543,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     runners.n = NM;
     for (let b = 0; b < run.nb(); b++) {
       const st = B[b * 6]!, rem = B[b * 6 + 3]!, g = groups[b]!, fs = floors[b]!, sh = B[b * 6 + 5]!;
+      let held = false;
+      for (let k = 0; k < NM; k++) if (MV[k]![24] === IN && MV[k]![5] === CLIMB && MV[k]![12] === b) held = true;
+      BAT[b]![2] = held ? -DEPTH + HELD : -DEPTH;
       g.pos[1] = run.yOff(b);
       g.pos[0] = BLD[b * 4]! + BLD[b * 4 + 1]! / 2 + (sh ? Math.sin(engine.time * 47 + b) * 0.07 * sh * calm : 0);
       g.rot[2] = LEAN[b * 2 + 1]! * (st === RUBBLE ? 0 : 1) + (sh ? Math.sin(engine.time * 31 + b * 2) * 0.014 * sh * calm : 0);
@@ -617,6 +639,49 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       chutes.a[k] = run.CH[o]! > 0 ? 1 : 0;
       chutes.x[k] = run.CH[o + 1]!; chutes.y[k] = run.CH[o + 2]! + 0.3; chutes.z[k] = run.CH[o + 3]!; chutes.r[k] = 0.3;
     }
+    for (let k = 0; k < twins.length; k++) twins[k]!();
+  }
+  /** Depth against the monsters: the street's little things (soldiers, parachutes, shots, rubble bits, the
+   *  wreckage) are points, and points sort after every cluster, so they drew over the monsters wherever they
+   *  were. Each pool gets a twin in the cluster BACK (just in front of the buildings, behind every monster
+   *  off a wall); each frame the points behind a monster they overlap (further from the camera than it;
+   *  lying on the street, under its feet too) move to the twin, the rest stay on top. */
+  function twin(src: DioramaPoints) {
+    const cap = src.x.length, map = new Int16Array(cap), hid = new Uint8Array(cap);
+    const draw = src.paint ?? ((ctx: CanvasRenderingContext2D, i: number, p: DioramaPoints) => {
+      ctx.fillStyle = p.color[i] || p.colorAll;
+      ctx.beginPath();
+      ctx.arc(p.sx[i]!, p.sy[i]!, p.sr[i]!, 0, TAU);
+      ctx.fill();
+    });
+    src.paint = (ctx, i, p) => void (hid[i] || draw(ctx, i, p));
+    const back = dio.points({ cap, cluster: "fxBack", layer: src.layer, paint: (ctx, j, p) => {
+      const i = map[j]!;
+      src.sx[i] = p.sx[j]!; src.sy[i] = p.sy[j]!; src.sr[i] = p.sr[j]!;
+      draw(ctx, i, src);
+    } });
+    twins.push(() => {
+      let n = 0;
+      for (let i = 0; i < src.n; i++) {
+        hid[i] = 0;
+        if (src.a[i]! <= 0 || !behindAny(src.x[i]!, src.y[i]!, src.z[i]!)) continue;
+        hid[i] = 1;
+        map[n] = i;
+        back.x[n] = src.x[i]!; back.y[n] = src.y[i]!; back.z[n] = src.z[i]!; back.r[n] = src.r[i]!; back.a[n] = src.a[i]!; back.color[n] = src.color[i];
+        n++;
+      }
+      back.n = n;
+    });
+  }
+  /** Is world (x, y, z) behind a monster off a wall that it overlaps on screen? */
+  function behindAny(x: number, y: number, z: number) {
+    for (let k = 0; k < NM; k++) {
+      const O = MV[k]!, m = mons[k]!;
+      if (O[24] !== IN || m.root.alpha <= 0 || O[5] === CLIMB) continue;
+      const rx = m.root.pos[0]!, ry = O[1]!;
+      if (Math.abs(x - rx) < 2.3 && y > ry - 0.5 && y < ry + m.height + 0.6 && z < O[2]! + (y - ry < 0.45 ? 0.75 : 0)) return true;
+    }
+    return false;
   }
 
   // ---- FX ----
@@ -896,7 +961,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     const fl = Math.round((S[8]! / Math.max(1, run.bk.L[2]!)) * 100);
     if (was[2] !== fl) (was[2] = fl), (flatEl.textContent = fl + "%");
     for (let k = 0; k < NM; k++) {
-      const O = MV[k]!, chip = monChips[k]!, d = O[28]!, shown = O[24] === IN || O[25]! > 0 || d !== AI, key = (shown ? 1 : 0) + d * 2 + Math.round(O[7]!) * 32 + O[25]! * 4096 + O[24]! * 7 + (O[29] ? 3 : 0);
+      const O = MV[k]!, chip = monChips[k]!, d = O[28]!, shown = O[24] === IN || O[25]! > 0 || d !== AI, key = (shown ? 1 : 0) + d * 2 + Math.round(O[7]!) * 32 + O[25]! * 4096 + O[24]! * 7 + (O[29] ? 3 : 0) + Math.round((O[46]! || 1) * 4) * 1e10;
       if (was[4 + k] === key) continue;
       was[4 + k] = key;
       chip.hidden = !shown;
@@ -907,7 +972,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       (chip.children[1] as HTMLElement).textContent = who(k);
       (chip.querySelector("s") as HTMLElement).style.width = `${Math.round(O[7]!)}%`;
       chip.classList.toggle("cs-low", O[7]! <= 30);
-      (chip.lastChild as HTMLElement).textContent = num(O[25]!);
+      // The combo, subtly, by the score: fast, accurate taps speed the punch up (./round.ts COMBO).
+      (chip.lastChild as HTMLElement).textContent = num(O[25]!) + ((O[46]! || 1) > 1 ? ` ×${O[46]}` : "");
     }
     const pk = S[28] ? S[29]! * 128 + S[30]! : -1;
     if (was[8] !== pk) {
@@ -1155,7 +1221,6 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
-    paintReach(ctx);
   }
   function bolt(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
     if (r < 3) return;
@@ -1471,6 +1536,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     }
   }
   function drawOverlay(ctx: CanvasRenderingContext2D) {
+    // The reach and the pick over the finished frame (in the ground's decal they were under the facades).
+    paintReach(ctx);
     if (fx.live) fx.draw(ctx, !P.night);
     for (let k = 0; k < NM; k++) {
       paintZap(ctx, k);
@@ -1519,7 +1586,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   // ---- taps and clicks: the target, the reach outline ----
   /** A tap waiting for the next input read: 1 a punch, 2 a grab, and its target; the cell lit by it, the
    *  mouse's cell, a miss's ring. */
-  let tapK = 0, tapT = 0, tapC = -1, tapF = 0, hoverC = -1, hoverG = false, missF = 0, missX = 0, missY = 0;
+  let tapK = 0, tapT = 0, tapF = 0, hoverC = -1, hoverG = false, hoverT = 0, missF = 0, missX = 0, missY = 0;
   /** This screen's own monster (online its seat's, else seat one's). */
   function own() {
     if (net) return MV[net.seat]!;
@@ -1566,7 +1633,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       return o && run.cell[i] !== HOLE ? T_GRAB + k : T_CELL + k;
     }
     // Someone at a window in the grab's reach (the next building across the gap, above, below).
-    for (let g = 0; g < NG; g++) {
+    for (let g = 0, n = run.grabCount(O); g < n; g++) {
       if (!grabRect(O, g) || !inTQ(x, y)) continue;
       const i = run.winAt(run.GC[0]!, run.GC[1]!);
       if (i >= 0 && run.occ[i] && run.cell[i] !== HOLE) return T_GRAB + g;
@@ -1602,13 +1669,13 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       for (let k = 0; k < NR; k++) {
         const i = run.reachCell(O, k);
         if (i < 0 || !winRect(i)) continue;
-        const live = run.LIVE[i]! > 0 && run.cell[i] !== HOLE, hot = k === hoverC || k === aimC, lit = k === tapC && tapF > 0;
-        ctx.globalAlpha = lit ? 0.95 : hot ? 0.8 : 0.38;
-        ctx.strokeStyle = live ? P.zap : trim;
-        ctx.lineWidth = lit || hot ? 2.2 : 1.2;
+        const live = run.LIVE[i]! > 0 && run.cell[i] !== HOLE, aimed = k === aimC && hoverT <= 0;
+        ctx.globalAlpha = aimed ? 0.8 : 0.38;
+        // The stick's aim (the keyboard's, the gamepad's) previews its punch in the punch's green.
+        ctx.strokeStyle = live ? P.zap : aimed ? P.pickHit : trim;
+        ctx.lineWidth = aimed ? 2.2 : 1.2;
         if (live) ctx.globalAlpha = Math.min(1, ctx.globalAlpha + pulse * 0.3);
         ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
-        if (lit) (ctx.globalAlpha = 0.25 * (tapF / 0.35)), (ctx.fillStyle = trim), ctx.fillRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
       }
     }
     // The grab's reach (all four sides), faint and dashed, while the mouse is on something to grab.
@@ -1617,18 +1684,64 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       ctx.strokeStyle = TRIMS[look.trim]?.c ?? P.zap;
       ctx.lineWidth = 1;
       ctx.globalAlpha = 0.3;
-      for (let g = 0; g < NG; g++) if (grabRect(O, g)) ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
+      for (let g = 0, n = run.grabCount(O); g < n; g++) if (grabRect(O, g)) ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
       ctx.setLineDash(NODASH);
     }
+    // The pick: what a tap or click chose, lit until the action lands (green: a punch, teal: a grab); the
+    // pointer's hover previews the same, fainter. Out of reach: a red ring and TOO FAR where it tapped.
+    if (O[24] === IN && !so.attract) {
+      if (hoverT > 0 && !(tapF > 0 && hoverT === tapT)) pick(ctx, O, hoverT, 0.5, missX, missY);
+      if (tapF > 0 && tapT !== T_MISS) pick(ctx, O, tapT, 1, missX, missY);
+    }
     if (missF > 0) {
-      ctx.globalAlpha = Math.min(1, missF * 2.5) * 0.7;
-      ctx.strokeStyle = P.ink;
-      ctx.lineWidth = 2;
+      const k = Math.min(1, missF * 2.5), fs = Math.max(12, Math.min(16, dio.width / 70));
+      ctx.globalAlpha = k * 0.9;
+      ctx.strokeStyle = P.pickFar;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(missX, missY, 10 + (0.4 - missF) * 30 * calm, 0, TAU);
+      ctx.arc(missX, missY, 10 + (0.6 - missF) * 20 * calm, 0, TAU);
       ctx.stroke();
+      ctx.font = `900 ${fs}px ui-rounded, system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = P.ink;
+      ctx.fillStyle = P.pickFar;
+      const ty = missY - 18 - (0.6 - missF) * 14 * calm;
+      ctx.strokeText("TOO FAR", missX, ty);
+      ctx.fillText("TOO FAR", missX, ty);
     }
     ctx.globalAlpha = 1;
+  }
+  /** What target t will do: 1 a punch (a window, a helicopter's swat, the street), 2 a grab, 3 nothing (out of reach). */
+  const pickKind = (t: number) => (t === T_MISS ? 3 : (t >= T_GRAB && t < T_HELI) || (t >= T_CHUTE && t < T_STREET) ? 2 : 1);
+  /** Light target t of monster O: its cell (a window, a grab cell) or a ring on the thing (a helicopter, a
+   *  parachute, a soldier), in the colour of what it will do; `a` 1 the pick, 0.5 the hover's preview (a thinner line, a fainter fill). */
+  function pick(ctx: CanvasRenderingContext2D, O: Float64Array, t: number, a: number, x: number, y: number) {
+    const kd = pickKind(t), col = kd === 1 ? P.pickHit : kd === 2 ? P.pickGrab : P.pickFar;
+    let ok = false, rr = 0;
+    if (t >= T_CELL && t < T_GRAB) ok = run.reachCell(O, t - T_CELL) >= 0 && winRect(run.reachCell(O, t - T_CELL));
+    else if (t >= T_GRAB && t < T_HELI) ok = grabRect(O, t - T_GRAB);
+    else if (t >= T_HELI && t < T_STREET) {
+      const H = run.HE, C = run.CH, So = run.SO;
+      const q = t < T_CHUTE ? (t - T_HELI) * 12 : t < T_SOLDIER ? (t - T_CHUTE) * 9 : (t - T_SOLDIER) * 8;
+      const on = t < T_CHUTE ? H[q] === 1 && dio.project(H[q + 1]!, H[q + 2]!, H[q + 3]!, tmp) : t < T_SOLDIER ? C[q]! > 0 && dio.project(C[q + 1]!, C[q + 2]! + 0.3, C[q + 3]!, tmp) : So[q]! > 0 && dio.project(So[q + 1]!, 0.5, So[q + 2]!, tmp);
+      if (on) (rr = Math.max(14, (dio.focal() * (t < T_CHUTE ? 1.3 : 0.6)) / tmp[2]!)), (x = tmp[0]!), (y = tmp[1]!);
+    } else if (t === T_MISS) rr = 12;
+    if (!ok && !rr) return;
+    const pulse = calm && a === 1 ? 0.08 * Math.sin(engine.time * 14) : 0;
+    ctx.globalAlpha = a === 1 ? 0.9 + pulse : 0.85;
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.lineWidth = a === 1 ? 3 : 2;
+    if (ok) {
+      ctx.strokeRect(TQ[0]! - 1, TQ[1]! - 1, TQ[2]! - TQ[0]! + 2, TQ[3]! - TQ[1]! + 2);
+      ctx.globalAlpha = a === 1 ? 0.28 + pulse : 0.1;
+      ctx.fillRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, rr, 0, TAU);
+      ctx.stroke();
+    }
   }
 
   // ---- input: four seats (the keyboard's halves, gamepads, the pad for seat one) ----
@@ -1728,7 +1841,13 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       if (stepCam(dt)) moving = true;
       if (shake > 0) (shake = Math.max(0, shake - dt)), (moving = true);
       if (toastT > 0) (toastT = Math.max(0, toastT - dt)), (moving = true), toastT === 0 && (toastEl.hidden = true);
-      if (tapF > 0 || missF > 0) (tapF = Math.max(0, tapF - dt)), (missF = Math.max(0, missF - dt)), (moving = true);
+      if (tapF > 0 || missF > 0) {
+        // The pick stays lit until its action lands (the punch's hit frame, the grab's reach), then fades.
+        const O = own(), waiting = tapK !== 0 || O[43] === tapT || O[44] === tapT || O[34]! > 0 || O[10]! > 0.55;
+        tapF = Math.max(0, waiting ? Math.max(tapF - dt, 0.12) : Math.min(tapF, 0.12) - dt);
+        missF = Math.max(0, missF - dt);
+        moving = true;
+      }
       if (S[0] === RUN || S[0] === CLEAR || (net && S[0] !== DONE)) moving = true;
       if (!net && S[0] === DONE && run.step(0, INP)) moving = true;
       if (moving || dirty) e.busy(), (dirty = true), (hudDirty = true);
@@ -1789,15 +1908,18 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     if (t <= 0) return;
     tapK = (t >= T_CELL && t < T_GRAB) || (t >= T_HELI && t < T_CHUTE) || t >= T_STREET ? 1 : 2;
     tapT = t;
-    tapC = t >= T_CELL && t < T_GRAB ? t - T_CELL : -1;
-    tapF = 0.35;
-    if (t === T_MISS) (missX = e.clientX - r.left), (missY = e.clientY - r.top), (missF = 0.4);
+    tapF = 0.7;
+    if (t === T_MISS) (missX = e.clientX - r.left), (missY = e.clientY - r.top), (missF = 0.6);
     engine.wake();
   }, sig);
   play.addEventListener("pointermove", (e) => {
     if (e.pointerType !== "mouse") return;
     const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, h = cellAt(own(), x, y), g = grabbableAt(x, y);
-    if (h !== hoverC || g !== hoverG) (hoverC = h), (hoverG = g), (dirty = true), engine.wake();
+    // The hover's preview: what a click here would do (a miss only over something out of reach).
+    let ht = tapAt(x, y);
+    if (ht === T_MISS && !g) ht = 0;
+    if (ht === T_MISS) (missX = x), (missY = y);
+    if (h !== hoverC || g !== hoverG || ht !== hoverT) (hoverC = h), (hoverG = g), (hoverT = ht), (dirty = true), engine.wake();
   }, sig);
   muteK.addEventListener("click", toggle, sig);
   menuK.addEventListener("click", () => so.on("menu", 0), sig);
