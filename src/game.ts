@@ -15,7 +15,7 @@ import { CITIES, NCITY } from "./cities.ts";
 import { buildMonster, heroName, shade, FURS, TRIMS, PATTERNS, FACES, GEAR, RIVALS, RIVAL_WHAT, type Look, type RigInk } from "./monster.ts";
 import { AI, NM, DONE } from "./round.ts";
 import { load, save, local, fresh, clearCity, startable, endRun, setPart, partName, unlockedBy, exportCode, importCode, type Profile, type Store, type Part } from "./profile.ts";
-import { encode, decode, packMode, unpackMode, joinRoom, rollback, lookBits, takeLook, lookOf, GONE, B_GONE, SEATS, LOOK_FRAMES, type Rollback } from "./net.ts";
+import { encode, decode, NI, packMode, unpackMode, joinRoom, rollback, lookBits, takeLook, lookOf, GONE, B_GONE, SEATS, LOOK_FRAMES, type Rollback } from "./net.ts";
 
 export interface CitySmashOptions {
   host?: HTMLElement | null;
@@ -245,7 +245,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     go: null as (() => void) | null,
     look: 0,
   };
-  const NIN = new Float64Array(SEATS * 5), MYIN = new Float64Array(SEATS * 5);
+  const NIN = new Float64Array(SEATS * NI), MYIN = new Float64Array(SEATS * NI);
   function netEnd() {
     net.abort?.abort();
     net.abort = null;

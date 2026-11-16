@@ -4,13 +4,14 @@
 import Base from '../layouts/Base.astro';
 import { base, GZIP, FIZLET, REPO } from '../site';
 import { CITIES } from '../../../src/cities.ts';
+import { REACH, NR, GRAB, NG, GRAB_HELI, NGH } from '../../../src/round.ts';
 const description = 'CitySmash: a giant cyber ape climbs and smashes his way across seven tabletop cities, day into night. Dress him in the garage, fight three rival giants, play with friends on one screen or online. Free in the browser, by Chris Cooley, built on Fizlet.';
 const kb = (GZIP / 1024).toFixed(1);
 const steps = [
   ['JUMP AT A WALL', 'Walk the street and jump at a building’s side: the jump grabs it. Hang on, climb up and down the edge. Your inside arm grips; your outside arm is free to smash.'],
-  ['PUNCH BY YOUR CLIMB', 'A punch hits the window next to you: the one level with you, or the one above or below by the way you just climbed. Three hits a window: a chip, a crack, a hole.'],
-  ['BRING IT DOWN', 'Enough holes and the building shakes, then pancakes floor by floor. Live boxes and neon signs bite: keep your hands off them. People at the windows are snacks.'],
-  ['CITY AFTER CITY', 'Flatten every building and the next city opens, a little later in the day and a lot angrier: more soldiers, armour on the tanks, faster helicopters.'],
+  ['TAP TO SMASH', 'Tap or click the window you want: in reach, he punches it. Long arms: three windows in on your floor, two on the floors above and below. Three hits a window: a chip, a crack, a hole. The far side is out of reach: climb the other edge.'],
+  ['TAP TO GRAB', 'Tap someone at a window, a soldier, a parachute or food close by: he grabs it and eats. Swat a helicopter right next to him. Out of reach, he swings at air. Live boxes and neon signs bite: pick the windows round them.'],
+  ['CITY AFTER CITY', 'Enough holes and a building shakes, then pancakes floor by floor. Flatten them all and the next city opens, later in the day and angrier: more soldiers, armour on the tanks, faster helicopters.'],
 ];
 const TOD = ['Day', 'Dusk', 'Night'];
 const mons = [
@@ -19,6 +20,24 @@ const mons = [
   ['GLOOPMAW', 'A tentacle blob', 'A dome of goo on tentacles, one eye, a wide mouth. It punches you off walls.', '#b23a9e', '#b6ff3a'],
   ['VOLTWING', 'A storm moth', 'Big crackling wings, feathered antennae, a bad attitude. Out from the fourth city on.', '#4a5f8c', '#fff36b'],
 ];
+// The reach diagram, from the game's own tables (src/round.ts REACH, GRAB, GRAB_HELI): six windows across
+// (two of open air and the ape's own column, then three of its building), five floors; the ape in the middle.
+const COLS = 6, ROWS = 5, APE_C = 2, APE_R = 2;
+const has = (t: number[], n: number, a: number, b: number, swap = false) => { for (let k = 0; k < n; k++) if ((swap ? t[k * 2 + 1] : t[k * 2]) === a && (swap ? t[k * 2] : t[k * 2 + 1]) === b) return true; return false; };
+const PUNCH_WORD: Record<string, string> = { '0,1': 'close', '0,2': 'mid', '0,3': 'far', '1,1': 'up', '1,2': 'up', '-1,1': 'down', '-1,2': 'down' };
+const grid = (kind: 'punch' | 'grab') => {
+  const cells: { cls: string; label: string }[] = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const inw = c - APE_C, up = APE_R - r, bld = inw > 0;
+    if (inw === 0 && up === 0) { cells.push({ cls: 'ape', label: 'APE' }); continue; }
+    if (kind === 'punch' && has(REACH, NR, up, inw)) cells.push({ cls: 'punch', label: PUNCH_WORD[up + ',' + inw]! });
+    else if (kind === 'grab' && has(GRAB_HELI, NGH, inw, up)) cells.push({ cls: 'heli', label: '+heli' });
+    else if (kind === 'grab' && has(GRAB, NG, inw, up)) cells.push({ cls: 'grab', label: 'grab' });
+    else cells.push({ cls: bld ? 'bld' : 'air', label: '' });
+  }
+  return cells;
+};
+const punchCells = grid('punch'), grabCells = grid('grab');
 const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'presence', 'ui'];
 ---
 <Base title="CitySmash · climb it, smash it" description={description}>
@@ -42,7 +61,29 @@ const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'pr
       <ol class="cards">
         {steps.map(([k, b], i) => <li class="panel"><span class="n">0{i + 1}</span><h3>{k}</h3><p>{b}</p></li>)}
       </ol>
-      <p class="soon">Keys: A/D walk · W/S climb · K jumps · Space punches (hold W or S: up or down) · L grabs and eats · M mutes. Phone: the stick on the left, PUNCH, JUMP and GRAB on the right. Gamepads work too.</p>
+      <div class="reach" id="reach">
+        <figure class="reach-fig">
+          <figcaption><b>PUNCH: {NR} windows</b> on the building he holds</figcaption>
+          <div class="reach-grid" role="img" aria-label={`Punch reach: ${NR} windows of his own building: close, mid and far on his floor, two up and two down.`}>
+            {punchCells.map((x) => <span class={'rc ' + x.cls} data-cell={x.cls}>{x.label}</span>)}
+          </div>
+        </figure>
+        <figure class="reach-fig">
+          <figcaption><b>GRAB: {NG} spaces</b> all round him</figcaption>
+          <div class="reach-grid" role="img" aria-label={`Grab reach: ${NG} spaces. The ${NGH} round him (helicopters too) and two out straight up, down, in and out (people, soldiers, food).`}>
+            {grabCells.map((x) => <span class={'rc ' + x.cls} data-cell={x.cls}>{x.label}</span>)}
+          </div>
+        </figure>
+        <ul class="reach-key">
+          <li><span class="rc ape" aria-hidden="true"></span> the ape on the building's edge</li>
+          <li><span class="rc bld" aria-hidden="true"></span> building</li>
+          <li><span class="rc air" aria-hidden="true"></span> open air</li>
+          <li><span class="rc punch" aria-hidden="true"></span> punch: his own building only</li>
+          <li><span class="rc grab" aria-hidden="true"></span> grab: people, soldiers, food</li>
+          <li><span class="rc heli" aria-hidden="true"></span> grab, and swat helicopters (next to him)</li>
+        </ul>
+      </div>
+      <p class="soon">Phone: the stick moves and climbs, JUMP jumps, tap what you want smashed or eaten. Computer: A/D walk, W/S climb, Space or K jumps, click to smash or grab, M mutes. No mouse or a gamepad: J punches (W or S held: up or down), a flick of the stick in or out steps the punch close, mid, far; L grabs the nearest snack.</p>
     </div>
   </section>
 

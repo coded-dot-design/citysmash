@@ -4,12 +4,12 @@ A giant cyber ape climbs and smashes his way across seven tabletop cities, day i
 
 ## The game
 
-- **Climb and smash.** Jump at a building's side wall: the jump grabs it. Hanging there, your inside arm grips and climbs; your outside arm smashes the window next to you (level with you, or the one above or below by the way you just climbed). Three hits a window: a chip, a crack, a hole. Enough holes and the building shakes, then pancakes floor by floor. Live power boxes, neon signs and roof antennas shock you off the wall. People at the windows are snacks (GRAB: health back). Soldiers, snipers, helicopters and tanks fight back; out of health, a monster shrinks to a tiny figure and runs off the table.
+- **Climb and smash.** Jump at a building's side wall: the jump grabs it. Hanging there, your inside arm grips and climbs; your outside arm smashes the window you tap or click, if it is in reach: three windows in on your floor (close, mid, far: a jab, a hook, a full swing), two in on the floors above and below; only the building you hold, never past the third window in, so the far side means climbing its other edge. Out of reach, he swings at air and loses a moment. Three hits a window: a chip, a crack, a hole. Enough holes and the building shakes, then pancakes floor by floor. Live power boxes, neon signs and roof antennas shock you off the wall. People at the windows are snacks: tap one in the grab's reach (the 8 spaces round him and 2 out straight each way) to eat it, health back; soldiers, parachutes and food too, and a helicopter right next to him gets swatted. Soldiers, snipers, helicopters and tanks fight back; out of health, a monster shrinks to a tiny figure and runs off the table.
 - **Seven cities** in a run, each with its own skyline, a landmark and a feature: Port Lumen (the harbour: a gunboat), Coilworth (the rail yard: a freight train), Brightfield (the stadium: live floodlights, a crowd), Voltmoor (the power plant: surges), Twin Span (the bridge: trucks), Glowgate (the neon strip) and Skyreach (the skyport: two helicopters). Day, then dusk, then night; the score carries over; a city ends when it is flat; the army grows city by city.
 - **Garage.** Fur, pattern, face, gear (a cyber arm on the smashing arm, a visor, a chest plate, tail spikes and more) and a neon trim, on a live turntable. Every city you flatten unlocks parts. One profile, saved on this device, plus a save code (`CS1-…`) to move it.
 - **Rivals and friends.** SHARDCLAW (a crystal crab-beast), GLOOPMAW (a tentacle blob) and VOLTWING (a storm moth) wreck the same cities. One to four players on one screen (WASD and the arrows, gamepads for three and four), or online: the host opens a room and sends the link; the host is the ape, friends take the rivals. A shared score and one each; you can still punch each other off the walls.
 
-Keys: A/D walk · W/S climb · K jumps · Space or J punches (hold W or S: up or down) · L grabs · M mutes · Escape for the menu. Player two: the arrows, `,` punches, `.` jumps, `/` grabs. Phone: a stick on the left; PUNCH, JUMP and GRAB on the right.
+Phone: the stick moves and climbs, JUMP jumps, tap to smash and grab. Computer: A/D walk · W/S climb · Space or K jumps · click to smash and grab · M mutes · Escape for the menu. Without a pointer (keys only, gamepads, players two to four): J punches the window by the hand (W or S held: up or down; a flick of the stick in or out steps it close, mid, far; past holes it goes further in), L grabs the nearest snack. Player two: the arrows, `,` punches, `.` jumps, `/` grabs. The reach and grab tables are one const each (`src/round.ts` `REACH`, `GRAB`, `GRAB_HELI`); the landing page draws its diagram from them.
 
 ## Use it
 
@@ -29,7 +29,7 @@ npm ci
 npm run check          # typecheck, build dist/, size budget
 npm test               # headless: the rules, every city, progression, determinism, the profile, rollback sync, zero allocation
 npm run test:settle    # it sleeps when nothing moves
-npm run test:browser   # start, the garage, climb and punch, eat, a building falls, city 2, 2P, the phone pad; the wall pose; online rooms
+npm run test:browser   # start, the garage, click and tap to smash (in reach, out of reach), eat, a building falls, city 2, 2P, the phone pad, full height at 390; the wall pose per reach cell; online rooms
 npm run site:build && npm run test:site
 ```
 

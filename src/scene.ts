@@ -21,10 +21,11 @@ import {
   createRun, NM, NS, NP, NCH, NH, NT, SEATS, AI, HERO, CRAB, IN, READY, RUN, CLEAR, DONE, CLIMB, ROOF, KO,
   E_START, E_HOLE, E_SHAKE, E_FLOOR, E_FLAT, E_HELI, E_HELI_CRASH, E_NOM, E_HURT, E_FLING, E_DROP, E_KO, E_END, E_STOMP, E_JUMP, E_LAND, E_CLIMB,
   E_SHOCK, E_TANK, E_BONK, E_BURN, E_JOIN, E_CHIP_, E_CRACK_, E_ARMOUR, E_TRAIN, E_BELLS, E_RAM, E_TRUCK, E_SURGE, E_CITY, E_CLEAR, E_PUNCH,
+  NI, NR, NG, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS,
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
-import { buildMonster, monName, shade, RIVALS, WALL, type Look, type Monster, type RigInk } from "./monster.ts";
+import { buildMonster, monName, shade, RIVALS, WALL, TRIMS, type Look, type Monster, type RigInk } from "./monster.ts";
 
 const TAU = 6.283185307179586;
 const mix = (a: string, b: string, k: number) => {
@@ -153,17 +154,12 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   if (so.sound === false || so.attract) snd.on = false;
   const c = controls(engine, { keys: { left: [], right: [], up: [], down: [], punch: [], jump: [], grab: [] }, target: play });
   const PUNCH = c.id("punch"), JUMP = c.id("jump"), GRAB = c.id("grab");
-  const ICON_PUNCH = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="9" width="15" height="11" rx="3.5"/><rect x="4" y="4.5" width="4.2" height="7" rx="2.1"/><rect x="8.6" y="3.5" width="4.2" height="8" rx="2.1"/><rect x="13.2" y="4.5" width="4.2" height="7" rx="2.1"/><rect x="15" y="10" width="6" height="4.5" rx="2.2"/></svg>';
   const ICON_JUMP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 12h5v8h6v-8h5z" fill="currentColor"/></svg>';
-  const ICON_GRAB = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="11" width="13" height="10" rx="4"/><rect x="6" y="3.5" width="3" height="10" rx="1.5"/><rect x="10" y="2" width="3" height="11" rx="1.5"/><rect x="14" y="3" width="3" height="10" rx="1.5"/><rect x="2.2" y="10" width="3" height="7.5" rx="1.5" transform="rotate(-30 3.7 13.7)"/></svg>';
   const thePad = pad(engine, c, {
     scheme: "stick",
     move: ["up", "down", "left", "right"],
-    actions: [
-      { intent: "punch", label: "PUNCH", icon: ICON_PUNCH, name: "Punch (Space or J; hold to keep punching)", key: "J", role: "fire", hold: true },
-      { intent: "jump", label: "JUMP", icon: ICON_JUMP, name: "Jump (K)", key: "K", role: "go" },
-      { intent: "grab", label: "GRAB", icon: ICON_GRAB, name: "Grab (L)", key: "L", role: "aim" },
-    ],
+    // Move and jump only: everything else is a tap on what to smash or grab.
+    actions: [{ intent: "jump", label: "JUMP", icon: ICON_JUMP, name: "Jump (Space or K)", key: "K", role: "go" }],
     host: stage,
   });
   thePad.el.classList.add("cs-pad");
@@ -436,7 +432,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   let nBits = 0, stopF = 0, nudge = 0;
 
   // ---- state ----
-  const INP = new Float64Array(SEATS * 5), I1 = new Float64Array(5), OWN = new Float64Array(10).fill(-1, 0, 1), tmp = new Float64Array(3), tmp2 = new Float64Array(3);
+  const INP = new Float64Array(SEATS * NI), I1 = new Float64Array(NI), OWN = new Float64Array(10).fill(-1, 0, 1), tmp = new Float64Array(3), tmp2 = new Float64Array(3), TQ = new Float64Array(4), DASH = [3, 4], NODASH: number[] = [];
   // [0] measure, [1] theme, [2] poster resolution, [3] safe top, [4] base oy, [5] drawn once, [6] gamepads on, [7] tall, [8] half width shown, [9] base ty.
   const V = new Float64Array(10);
   V[0] = V[1] = 1;
@@ -450,22 +446,42 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   engine.signal.addEventListener("abort", () => ro.disconnect(), { once: true });
   addEventListener("gamepadconnected", () => ((V[6] = 1), engine.wake()), sig);
 
-  // One camera per stage shape: side-on, a little above the street; a resize changes the field of view only.
+  // One camera per stage shape: side-on, a little above the street; the city's whole height (its tallest
+  // building and its crown, the street in front) always fits the stage under the
+  // HUD, on every viewport; the camera only pans left and right; a resize changes the field of view only.
   function frame() {
-    const Wd = dio.width, H = dio.height, tall = Wd / H < 1.25, cam = dio.cam;
+    const Wd = dio.width, H = dio.height, tall = Wd / H < 1.25, cam = dio.cam, cty = CITIES[S[16]!]!, BLD = run.BLD;
     V[7] = tall ? 1 : 0;
     cam.yaw = 0;
     cam.pitch = tall ? 0.16 : 0.22;
     cam.dist = 30;
-    // Wide: about 25 units across; tall: about 16 units high (the hero a quarter of the stage or more).
-    const hf = (V[8] = tall ? (8 * Wd) / H : 12.5);
-    cam.fov = 2 * Math.atan((hf / cam.dist) * (H / Wd));
-    cam.tz = CITIES[S[16]!]!.feature === HARBOUR ? 1.5 : 0.2;
+    cam.tz = cty.feature === HARBOUR ? 1.5 : 0.2;
     cam.ox = 0;
-    V[9] = tall ? 4.2 : 5.0;
-    cam.oy = V[4] = tall ? H * 0.04 : Math.min(H * 0.05, V[3]! * 0.3);
+    cam.oy = 0;
+    // The tallest thing: a building's roof (the landmark's crown on top).
+    let hi = 0;
+    for (let b = 0; b < run.nb(); b++) hi = Math.max(hi, BLD[b * 4 + 2]! + (b === cty.landmark ? (cty.crown === C_SPIRE ? 4.4 : 2.6) : 0.8));
+    const yTop = hi + 0.3, yBot = -0.2, top = V[3]! + 4, bot = H - 4;
+    // Wide: about 25 units across, unless that crops the height; tall: as much width as the height leaves
+    // (the hero a quarter of the stage or more wherever the height allows; the full height wins).
+    V[9] = (yTop + yBot) / 2;
     cam.tx = camWant(0);
-    cam.ty = camWant(1);
+    cam.ty = V[9]!;
+    let hv = tall ? (yTop - yBot) / 2 : 12.5 * (H / Wd);
+    for (let it = 0; it < 6; it++) {
+      cam.fov = 2 * Math.atan(hv / cam.dist);
+      dio.project(cam.tx, yTop, -DEPTH, tmp);
+      dio.project(cam.tx, yBot, STREET1, tmp2);
+      const span = tmp2[1]! - tmp[1]!, room = bot - top;
+      if (!tall && it === 0 && span <= room) break;
+      hv *= span / room;
+    }
+    cam.fov = 2 * Math.atan(hv / cam.dist);
+    dio.project(cam.tx, yTop, -DEPTH, tmp);
+    dio.project(cam.tx, yBot, STREET1, tmp2);
+    // Centre the city's height in the room under the HUD.
+    cam.oy = V[4] = (top + bot) / 2 - (tmp[1]! + tmp2[1]!) / 2;
+    V[8] = Math.tan(cam.fov / 2) * cam.dist * (Wd / H);
   }
   /** The monster the camera follows: this screen's online, else the players' middle, else the hero. */
   function focus(axis: number) {
@@ -482,7 +498,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       const lim = Math.max(0, run.SX + 1.5 - V[8]!);
       return Math.max(-lim, Math.min(lim, focus(0)));
     }
-    return Math.max(V[9]!, Math.min(9, focus(1) + 2.6));
+    return V[9]!;
   }
   function stepCam(dt: number) {
     const cam = dio.cam, d = camWant(0) - cam.tx, e = camWant(1) - cam.ty;
@@ -1125,6 +1141,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
+    paintReach(ctx);
   }
   function bolt(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
     if (r < 3) return;
@@ -1485,11 +1502,126 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     }
   }
 
+  // ---- taps and clicks: the target, the reach outline ----
+  /** A tap waiting for the next input read: 1 a punch, 2 a grab, and its target; the cell lit by it, the
+   *  mouse's cell, a miss's ring. */
+  let tapK = 0, tapT = 0, tapC = -1, tapF = 0, hoverC = -1, hoverG = false, missF = 0, missX = 0, missY = 0;
+  /** This screen's own monster (online its seat's, else seat one's). */
+  function own() {
+    if (net) return MV[net.seat]!;
+    for (let k = 0; k < NM; k++) if (MV[k]![28] === 0) return MV[k]!;
+    return MV[0]!;
+  }
+  /** Window i's corners on screen into TQ (x0, y0, x1, y1); false off screen. */
+  function winRect(i: number) {
+    const b = run.bk.bOf(i), w = run.BLD[b * 4 + 1]!, rel = i - run.C0[b]!, fl = (rel / w) | 0, col = rel - fl * w, x = run.BLD[b * 4]! + col, y = run.yOff(b) + fl;
+    if (!dio.project(x + 0.04, y + 0.96, 0.05, tmp) || !dio.project(x + 0.96, y + 0.04, 0.05, tmp2)) return false;
+    TQ[0] = tmp[0]!; TQ[1] = tmp[1]!; TQ[2] = tmp2[0]!; TQ[3] = tmp2[1]!;
+    return true;
+  }
+  /** The reach cell of monster O under screen point (x, y), or −1. */
+  function cellAt(O: Float64Array, x: number, y: number) {
+    for (let k = 0; k < NR; k++) {
+      const i = run.reachCell(O, k);
+      if (i >= 0 && winRect(i) && x >= TQ[0]! - 2 && x <= TQ[2]! + 2 && y >= TQ[1]! - 2 && y <= TQ[3]! + 2) return k;
+    }
+    return -1;
+  }
+  /** Grab cell g of monster O on screen into TQ; false off screen. */
+  function grabRect(O: Float64Array, g: number) {
+    run.grabCell(O, g);
+    const x = run.GC[0]!, y = run.GC[1]!;
+    if (!dio.project(x - 0.46, y + 0.46, 0.05, tmp) || !dio.project(x + 0.46, y - 0.46, 0.05, tmp2)) return false;
+    TQ[0] = tmp[0]!; TQ[1] = tmp[1]!; TQ[2] = tmp2[0]!; TQ[3] = tmp2[1]!;
+    return true;
+  }
+  const inTQ = (x: number, y: number) => x >= TQ[0]! - 2 && x <= TQ[2]! + 2 && y >= TQ[1]! - 2 && y <= TQ[3]! + 2;
+  /** What a tap at (x, y) does, as a target code: a window in the punch's reach is a punch (a grab when
+   *  someone is at it), a grabbable in the grab's reach (./round.ts GRAB) a grab, a helicopter next to it (GRAB_HELI) a swat; off a
+   *  wall a tap near enough punches that way; anything else a whiff (T_MISS). 0: nothing (not in play). */
+  function tapAt(x: number, y: number) {
+    const O = own(), fc = dio.focal(), near = (wx: number, wy: number, wz: number, r: number) => dio.project(wx, wy, wz, tmp) && Math.hypot(tmp[0]! - x, tmp[1]! - y) < Math.max(22, (fc * r) / tmp[2]!);
+    if (O[24] !== IN || O[5] === KO) return 0;
+    const HE = run.HE, CH = run.CH, SO = run.SO;
+    for (let h = 0; h < NH; h++) if (HE[h * 12] === 1 && near(HE[h * 12 + 1]!, HE[h * 12 + 2]!, HE[h * 12 + 3]!, 1.4)) return run.inGrab(O, HE[h * 12 + 1]!, HE[h * 12 + 2]!, true) ? T_HELI + h : T_MISS;
+    for (let k = 0; k < NCH; k++) if (CH[k * 9]! > 0 && !CH[k * 9 + 7] && near(CH[k * 9 + 1]!, CH[k * 9 + 2]!, CH[k * 9 + 3]!, 0.8)) return run.inGrab(O, CH[k * 9 + 1]!, CH[k * 9 + 2]!) ? T_CHUTE + k : T_MISS;
+    for (let k = 0; k < NS; k++) if (SO[k * 8]! > 0 && near(SO[k * 8 + 1]!, 0.8, SO[k * 8 + 2]!, 0.8)) return run.inGrab(O, SO[k * 8 + 1]!, 0.8) ? T_SOLDIER + k : T_MISS;
+    const k = cellAt(O, x, y);
+    if (k >= 0) {
+      const i = run.reachCell(O, k), o = run.occ[i]!;
+      return o && run.cell[i] !== HOLE ? T_GRAB + k : T_CELL + k;
+    }
+    // Someone at a window in the grab's reach (the next building across the gap, above, below).
+    for (let g = 0; g < NG; g++) {
+      if (!grabRect(O, g) || !inTQ(x, y)) continue;
+      const i = run.winAt(run.GC[0]!, run.GC[1]!);
+      if (i >= 0 && run.occ[i] && run.cell[i] !== HOLE) return T_GRAB + g;
+    }
+    if (O[5] !== CLIMB) {
+      // Off a wall: a tap within reach either way punches that way (the street's soldiers, the tank, the trucks).
+      for (let g = 0; g < NG; g++) if (grabRect(O, g) && inTQ(x, y)) return T_STREET + (run.GC[0]! > O[0]! ? 1 : 0);
+    }
+    return T_MISS;
+  }
+  /** Is a grabbable under (x, y) (someone at a window, a parachute, a soldier)? The mouse shows the grab's reach then. */
+  function grabbableAt(x: number, y: number) {
+    const t = tapAt(x, y);
+    if (t >= T_GRAB && t < T_HELI || t >= T_CHUTE && t < T_STREET) return true;
+    // Out of reach too: someone at a window under the pointer.
+    for (let b = 0; b < run.nb(); b++) {
+      const w = run.BLD[b * 4 + 1]!, f = run.BLD[b * 4 + 2]!;
+      for (let k = 0; k < w * f; k++) {
+        const i = run.C0[b]! + k;
+        if (run.occ[i] && run.cell[i] !== HOLE && winRect(i) && inTQ(x, y)) return true;
+      }
+    }
+    return false;
+  }
+  /** The reach on a wall, subtly: a thin neon outline round each cell in reach (live ones in the warning
+   *  colour, with a pulse unless motion is reduced), the aimed or hovered cell brighter, a tapped one lit;
+   *  a miss's ring where a tap found nothing in reach. */
+  function paintReach(ctx: CanvasRenderingContext2D) {
+    const O = own();
+    if (O[5] === CLIMB && O[24] === IN && !so.attract) {
+      const my = O[28] === 0 && !net ? I1[1]! : 0, row = my > 0.3 ? 3 : my < -0.3 ? 5 : 0, aimC = row + Math.min(row ? 1 : 2, O[39]!), trim = TRIMS[look.trim]?.c ?? P.zap;
+      const pulse = calm ? 0.5 + 0.5 * Math.sin(engine.time * 8) : 0.5;
+      for (let k = 0; k < NR; k++) {
+        const i = run.reachCell(O, k);
+        if (i < 0 || !winRect(i)) continue;
+        const live = run.LIVE[i]! > 0 && run.cell[i] !== HOLE, hot = k === hoverC || k === aimC, lit = k === tapC && tapF > 0;
+        ctx.globalAlpha = lit ? 0.95 : hot ? 0.8 : 0.38;
+        ctx.strokeStyle = live ? P.zap : trim;
+        ctx.lineWidth = lit || hot ? 2.2 : 1.2;
+        if (live) ctx.globalAlpha = Math.min(1, ctx.globalAlpha + pulse * 0.3);
+        ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
+        if (lit) (ctx.globalAlpha = 0.25 * (tapF / 0.35)), (ctx.fillStyle = trim), ctx.fillRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
+      }
+    }
+    // The grab's reach (all four sides), faint and dashed, while the mouse is on something to grab.
+    if (hoverG && O[24] === IN && O[5] !== KO && !so.attract) {
+      ctx.setLineDash(DASH);
+      ctx.strokeStyle = TRIMS[look.trim]?.c ?? P.zap;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.3;
+      for (let g = 0; g < NG; g++) if (grabRect(O, g)) ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
+      ctx.setLineDash(NODASH);
+    }
+    if (missF > 0) {
+      ctx.globalAlpha = Math.min(1, missF * 2.5) * 0.7;
+      ctx.strokeStyle = P.ink;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(missX, missY, 10 + (0.4 - missF) * 30 * calm, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // ---- input: four seats (the keyboard's halves, gamepads, the pad for seat one) ----
   const GP = new Float64Array(SEATS * 6), GB = new Uint8Array(SEATS * 3);
   // Seat two's keys: [left, right, up, down] held, and the presses (punch, jump, grab).
   const K2 = new Float64Array(4), K2P = new Uint8Array(3);
-  /** Read every seat on this screen into IN (5 numbers a seat). */
+  /** Read every seat on this screen into IN (NI numbers a seat); seat one's tap or click rides as a target. */
   function readSeats(out: Float64Array) {
     out.fill(0);
     if (!endC.hidden) return;
@@ -1502,20 +1634,22 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       I1[2] = c.hit(PUNCH) || c.down(PUNCH) || GP[2]! || GP[5]! ? 1 : 0;
       I1[3] = c.hit(JUMP) || GP[3]! ? 1 : 0;
       I1[4] = c.hit(GRAB) || GP[4]! ? 1 : 0;
+      I1[5] = 0;
+      if (tapK) (I1[5] = tapT), (I1[tapK === 1 ? 2 : 4] = 1), (tapK = 0);
     }
-    for (let j = 0; j < 5; j++) out[j] = I1[j]!;
-    out[5] = GP[6]! || K2[1]! - K2[0]!;
-    out[6] = -GP[7]! || K2[2]! - K2[3]!;
-    out[7] = K2P[0] || GP[8]! ? 1 : 0;
-    out[8] = K2P[1] || GP[9]! ? 1 : 0;
-    out[9] = K2P[2] || GP[10]! ? 1 : 0;
+    for (let j = 0; j < NI; j++) out[j] = I1[j]!;
+    out[NI] = GP[6]! || K2[1]! - K2[0]!;
+    out[NI + 1] = -GP[7]! || K2[2]! - K2[3]!;
+    out[NI + 2] = K2P[0] || GP[8]! ? 1 : 0;
+    out[NI + 3] = K2P[1] || GP[9]! ? 1 : 0;
+    out[NI + 4] = K2P[2] || GP[10]! ? 1 : 0;
     for (let s = 2; s < SEATS; s++) {
       const o = s * 6;
-      out[s * 5] = GP[o]!;
-      out[s * 5 + 1] = -GP[o + 1]!;
-      out[s * 5 + 2] = GP[o + 2]!;
-      out[s * 5 + 3] = GP[o + 3]!;
-      out[s * 5 + 4] = GP[o + 4]!;
+      out[s * NI] = GP[o]!;
+      out[s * NI + 1] = -GP[o + 1]!;
+      out[s * NI + 2] = GP[o + 2]!;
+      out[s * NI + 3] = GP[o + 3]!;
+      out[s * NI + 4] = GP[o + 4]!;
     }
     K2P.fill(0);
     for (let s = 0; s < SEATS; s++) GP[s * 6 + 2] = GP[s * 6 + 3] = GP[s * 6 + 4] = 0;
@@ -1573,12 +1707,14 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         if (run.step(dt, INP)) dirty = true;
         if (run.n) events();
       }
-      if (built !== S[16]) buildScene();
+      // A new city: its own framing (its tallest building fits), set once.
+      if (built !== S[16]) buildScene(), frame();
       let moving = false;
       if (stepFx(dt)) moving = true;
       if (stepCam(dt)) moving = true;
       if (shake > 0) (shake = Math.max(0, shake - dt)), (moving = true);
       if (toastT > 0) (toastT = Math.max(0, toastT - dt)), (moving = true), toastT === 0 && (toastEl.hidden = true);
+      if (tapF > 0 || missF > 0) (tapF = Math.max(0, tapF - dt)), (missF = Math.max(0, missF - dt)), (moving = true);
       if (S[0] === RUN || S[0] === CLEAR || (net && S[0] !== DONE)) moving = true;
       if (!net && S[0] === DONE && run.step(0, INP)) moving = true;
       if (moving || dirty) e.busy(), (dirty = true), (hudDirty = true);
@@ -1598,7 +1734,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
 
   // Keys on the stage: seat one (WASD, Space/J, K, L; the arrows too while seat two is out), seat two
   // (the arrows, comma, period, slash: its first press brings it in), M mutes, Escape is the menu.
-  const MAP: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down", Space: "punch", KeyJ: "punch", KeyK: "jump", KeyL: "grab" };
+  const MAP: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down", Space: "jump", KeyJ: "punch", KeyK: "jump", KeyL: "grab" };
   const ARROWS: Record<string, string> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
   const P2KEYS: Record<string, number> = { ArrowLeft: 0, ArrowRight: 1, ArrowUp: 2, ArrowDown: 3 }, P2ACT: Record<string, number> = { Comma: 0, Period: 1, Slash: 2 };
   stage.addEventListener("keydown", (e) => {
@@ -1627,14 +1763,27 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     const k = MAP[e.code] ?? ARROWS[e.code];
     if (k) c.press(k, false);
   }, sig);
+  // A tap or a click: on what is in reach (a window: a punch, or a grab when someone is at it; a helicopter:
+  // a swat; a parachute or a soldier: a grab); out of reach nothing happens (the cells don't light, a ring
+  // marks the miss). Off a wall a tap on nothing punches in front (as before).
   play.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     play.focus({ preventScroll: true });
     if (!endC.hidden || so.attract) return;
     auto = false;
-    c.press("punch");
-    c.press("punch", false);
+    const r = canvas.getBoundingClientRect(), t = tapAt(e.clientX - r.left, e.clientY - r.top);
+    if (t <= 0) return;
+    tapK = (t >= T_CELL && t < T_GRAB) || (t >= T_HELI && t < T_CHUTE) || t >= T_STREET ? 1 : 2;
+    tapT = t;
+    tapC = t >= T_CELL && t < T_GRAB ? t - T_CELL : -1;
+    tapF = 0.35;
+    if (t === T_MISS) (missX = e.clientX - r.left), (missY = e.clientY - r.top), (missF = 0.4);
     engine.wake();
+  }, sig);
+  play.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, h = cellAt(own(), x, y), g = grabbableAt(x, y);
+    if (h !== hoverC || g !== hoverG) (hoverC = h), (hoverG = g), (dirty = true), engine.wake();
   }, sig);
   muteK.addEventListener("click", toggle, sig);
   menuK.addEventListener("click", () => so.on("menu", 0), sig);

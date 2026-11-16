@@ -87,3 +87,19 @@ html.bui[data-theme="light"] .panel{box-shadow:5px 5px 0 var(--ink)}
 .dt-hero{background:#0c0a1a}
 .dt-hero::before{background:linear-gradient(90deg,rgba(12,10,26,.88) 0%,rgba(12,10,26,.6) 36%,rgba(12,10,26,0) 62%)}
 @media (max-width:560px){.dt-hero::before{background:linear-gradient(0deg,rgba(12,10,26,.92) 0%,rgba(12,10,26,.6) 44%,rgba(12,10,26,0) 70%)}}
+/* The reach diagram: two window grids (punch, grab) from the game's tables, a key under them. */
+.reach{display:grid;grid-template-columns:1fr 1fr;gap:18px 40px;margin:34px 0 0}
+.reach-fig{margin:0}
+.reach-fig figcaption{font:800 15px var(--round);color:var(--muted);margin:0 0 10px}.reach-fig figcaption b{color:var(--ink);font-size:20px;margin-right:6px}
+.reach-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;max-width:460px}
+.rc{display:grid;place-items:center;aspect-ratio:1;border-radius:9px;font:800 clamp(10px,1.3vw,13px) var(--mono);color:#07060f;border:2px solid transparent}
+.rc.air{background:var(--surface);border-color:var(--line)}
+.rc.bld{background:color-mix(in srgb,var(--surface) 55%,#6a5acd)}
+.rc.ape{background:#e8712f;border-color:var(--rim)}.reach-grid .rc.ape::after{content:""}
+.rc.punch{background:var(--hot);border-color:var(--rim)}
+.rc.grab{background:var(--cyan);border-color:var(--rim)}
+.rc.heli{background:var(--sun);border-color:var(--rim)}
+html.bui[data-theme="light"] .rc.punch,html.bui[data-theme="light"] .rc.grab,html.bui[data-theme="light"] .rc.heli,html.bui[data-theme="light"] .rc.ape{color:#fff}
+.reach-key{grid-column:1/-1;list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 24px;font:700 15px var(--round)}
+.reach-key li{display:flex;align-items:center;gap:10px}.reach-key .rc{width:26px;flex:none;border-radius:7px}
+@media (max-width:760px){.reach{grid-template-columns:1fr}.reach-key{grid-template-columns:1fr}}

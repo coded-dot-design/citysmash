@@ -16,9 +16,9 @@ const { NCMAX, NBMAX, HOLE, INTACT, CRACKED, SHAKE, RUBBLE, GAP } = await import
 const { HAND, ZW } = await import("../src/climber.ts");
 const { READY, RUN, CLEAR, DONE, WALK, AIR, CLIMB, ROOF, KO, IN, OUT, AI, CRAB } = R;
 
-/** Play n frames; `input(I, i)` fills seat one's five numbers (I[0..4]) and the others'; "auto": the autopilot. */
+/** Play n frames; `input(I, i)` fills seat one's numbers (I[0..5], R.NI a seat) and the others'; "auto": the autopilot. */
 function play(run, n, input) {
-  const I = new Float64Array(20), A = new Float64Array(5), ev = [];
+  const I = new Float64Array(24), A = new Float64Array(6), ev = [];
   for (let i = 0; i < n && run.S[0] !== DONE; i++) {
     I.fill(0);
     if (input === "auto") run.autopilot(A, 0), I.set(A, 0);
@@ -118,13 +118,141 @@ test("from the wall every punch lands on the one window in front (chip, crack, h
   let frame = -1;
   play(r, 30, (I, f) => { I[2] = f === 0 ? 1 : 0; if (frame < 0 && r.HIT[j]) frame = f; });
   assert.equal(frame, Math.round(R.PUNCH_HIT * 60), "the hit lands on a fixed frame");
-  // Climbing up a moment ago: the punch goes to the window above.
+  // Up held with the punch: the window above (the climb stops while the punch is out).
   const u = quiet();
   hangAt(u, u.M, b, -1, 2);
-  play(u, 6, (I) => (I[1] = 1));
+  play(u, 6);
   const fl = Math.floor(u.M[1] + HAND - u.yOff(b));
-  play(u, 20, (I, f) => (I[2] = f === 0 ? 1 : 0));
+  play(u, 20, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[1] = f === 0 ? 1 : 0)));
   assert.equal(u.HIT[cellOf(u, b, fl + 1, 0)], 1, "up: the window above");
+});
+
+test("the reach on a wall: 7 cells (level close, medium, far; up and down close, medium), 5 on the top floor; the far side out of reach", () => {
+  const run = quiet(), M = run.M, BLD = run.BLD;
+  assert.deepEqual(R.REACH, [0, 1, 0, 2, 0, 3, 1, 1, 1, 2, -1, 1, -1, 2], "one table");
+  let b = -1;
+  for (let k = 0; k < run.nb(); k++) if (BLD[k * 4 + 1] >= 5 && BLD[k * 4 + 2] >= 5) b = k;
+  assert.ok(b >= 0, "a building at least 5 wide");
+  const w = BLD[b * 4 + 1], f = BLD[b * 4 + 2];
+  for (const s of [-1, 1]) {
+    hangAt(run, M, b, s, 2);
+    assert.equal(run.reachCount(M), 7, `side ${s}: seven on the wall`);
+    const col = (c) => (s < 0 ? c - 1 : w - c);
+    for (let c = 0; c < R.NR; c++) assert.equal(run.reachCell(M, c), cellOf(run, b, 2 + R.REACH[c * 2], col(R.REACH[c * 2 + 1])), `side ${s}, cell ${c}`);
+    // Never past the third window in: the far side is the other edge's.
+    for (let c = 0; c < R.NR; c++) { const i = run.reachCell(M, c) - run.C0[b], cc = i % w; assert.ok(s < 0 ? cc < 3 : cc > w - 4, "in reach only three windows in"); }
+    hangAt(run, M, b, s, f - 1);
+    assert.equal(run.reachCount(M), 5, `side ${s}: five on the top floor`);
+    hangAt(run, M, b, s, 0); M[1] = 0.05 - 1; // (the hand on the bottom floor: a monster hung low)
+    assert.equal(run.levelRow(M), 0);
+    assert.equal(run.reachCount(M), 5, `side ${s}: five on the bottom floor`);
+  }
+});
+
+test("a tap picks the window: in reach it is punched (live parts too), out of reach a whiff; keys aim close, medium, far", () => {
+  const run = quiet(), M = run.M, b = 3, w = run.BLD[b * 4 + 1];
+  run.LIVE.fill(0);
+  hangAt(run, M, b, -1, 3);
+  play(run, 10);
+  // The far window, past the close and medium ones (still whole).
+  play(run, 20, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[5] = f === 0 ? R.T_CELL + 2 : 0)));
+  assert.equal(run.HIT[cellOf(run, b, 3, 2)], 1, "the far window chipped");
+  assert.equal(run.HIT[cellOf(run, b, 3, 0)] + run.HIT[cellOf(run, b, 3, 1)], 0, "the near ones untouched");
+  // Down medium.
+  play(run, 20, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[5] = f === 0 ? R.T_CELL + 6 : 0)));
+  assert.equal(run.HIT[cellOf(run, b, 2, 1)], 1, "down medium chipped");
+  // A miss: the swing and nothing else.
+  const before = run.HIT.reduce((a, v) => a + v, 0);
+  const ev = play(run, 20, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[5] = f === 0 ? R.T_MISS : 0)));
+  assert.ok(ev.some((e) => e[0] === R.E_PUNCH) && ev.some((e) => e[0] === R.E_WHIFF), "a swing, a whiff");
+  assert.equal(run.HIT.reduce((a, v) => a + v, 0), before, "nothing hit");
+  // A cell off the building (the top floor's up row): a whiff too.
+  hangAt(run, M, b, -1, run.BLD[b * 4 + 2] - 1);
+  play(run, 10);
+  const ev2 = play(run, 20, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[5] = f === 0 ? R.T_CELL + 3 : 0)));
+  assert.ok(ev2.some((e) => e[0] === R.E_WHIFF), "out of reach: a whiff");
+  // Keys: a flick in towards the building steps the aim (close → medium → far), the punch goes there.
+  const k = quiet(), K = k.M;
+  k.LIVE.fill(0);
+  hangAt(k, K, b, -1, 3);
+  play(k, 10);
+  play(k, 4, (I, f) => (I[0] = f < 2 ? 1 : 0));
+  play(k, 4, (I, f) => (I[0] = f < 2 ? 1 : 0));
+  assert.equal(K[39], 2, "aimed far");
+  play(k, 20, (I, f) => (I[2] = f === 0 ? 1 : 0));
+  assert.equal(k.HIT[cellOf(k, b, 3, 2)], 1, "the key punch went far");
+  void w;
+});
+
+test("the grab's reach: people, soldiers and food in the 12 cells round it on every side; helicopters only next to it; out of reach the hand closes on air", () => {
+  assert.equal(R.GRAB.length, 24, "12 grab cells, one table");
+  assert.equal(R.GRAB_HELI.length, 16, "8 for the helicopters, one table");
+  const g = (dx, dy) => { for (let i = 0; i < R.NG; i++) if (R.GRAB[i * 2] === dx && R.GRAB[i * 2 + 1] === dy) return i; return -1; };
+  const run = quiet(), M = run.M, b = 3, x0 = run.BLD[b * 4];
+  run.LIVE.fill(0);
+  hangAt(run, M, b, -1, 3);
+  play(run, 10);
+  const lv = run.yOff(b) + 3 + 0.5, me = x0 - 0.5;
+  const grab = (t, n = 30) => play(run, n, (I, f) => ((I[4] = f === 0 ? 1 : 0), (I[5] = f === 0 ? t : 0)));
+  const noms = (ev) => ev.filter((e) => e[0] === R.E_NOM).length;
+  // In towards the building: someone two windows in.
+  run.occ[cellOf(run, b, 3, 1)] = 1;
+  assert.equal(noms(grab(R.T_GRAB + g(2, 0))), 1, "in: eaten");
+  // Out into the air, up, down: a parachute two cells away each way.
+  for (const [dx, dy, name] of [[-2, 0, "out (the air side)"], [0, 2, "up"], [0, -2, "down"], [-1, 1, "a diagonal"]]) {
+    run.CH.fill(0);
+    run.CH.set([1, me - dx, lv + dy, 0.3, 0, 0, 1, 0, 0], 0);
+    assert.equal(noms(grab(R.T_CHUTE + 0)), 1, `${name}: grabbed`);
+  }
+  // Three away (out of reach): the hand closes on air.
+  run.CH.fill(0);
+  run.CH.set([1, me - 3, lv, 0.3, 0, 0, 1, 0, 0], 0);
+  const miss = grab(R.T_CHUTE + 0);
+  assert.equal(noms(miss), 0, "out of reach: nothing");
+  assert.ok(miss.some((e) => e[0] === R.E_WHIFF), "a whiff");
+  assert.ok(run.CH[0] > 0, "the parachute is still there");
+  // A helicopter: swatted next to it, a whiff two cells away.
+  const heli = (dx) => {
+    run.HE.fill(0);
+    run.HE.set([1, me - dx, lv, 0.4], 0);
+    run.HE[8] = run.HE[20] = 1e9;
+    return play(run, 20, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[5] = f === 0 ? R.T_HELI : 0)));
+  };
+  assert.ok(heli(-2).some((e) => e[0] === R.E_WHIFF) && run.HE[0] === 1, "a chopper two away: a whiff");
+  assert.ok(heli(-1).some((e) => e[0] === R.E_HELI), "a chopper next to it: swatted");
+});
+
+test("spam does not pay: ten rapid taps on one window land no more than the fixed timing allows; a whiff costs a recovery", () => {
+  const run = quiet(), M = run.M, b = 3;
+  run.LIVE.fill(0);
+  hangAt(run, M, b, -1, 3);
+  play(run, 10);
+  const i = cellOf(run, b, 3, 1);
+  // Ten taps in half a second (one every three frames), then nothing.
+  const ev = play(run, 30 + 40, (I, f) => { if (f < 30 && f % 3 === 0) (I[2] = 1), (I[5] = R.T_CELL + 1); });
+  const punches = ev.filter((e) => e[0] === R.E_PUNCH).length, most = Math.floor(0.5 / R.PUNCH_CD) + 2;
+  assert.ok(punches <= most && run.HIT[i] === punches, `${punches} punches, ${run.HIT[i]} hits (at most ${most}: one each ${R.PUNCH_CD} s, one queued)`);
+  // A whiff: the next punch waits the swing and the recovery.
+  play(run, 30);
+  let next = -1;
+  for (let f = 0; f < 60 && next < 0; f++) {
+    const e = play(run, 1, (I) => { if (f === 0) (I[2] = 1), (I[5] = R.T_MISS); else if (f % 2 === 0) (I[2] = 1), (I[5] = R.T_CELL); });
+    if (f > 0 && e.some((x) => x[0] === R.E_PUNCH)) next = f;
+  }
+  assert.ok(next >= Math.round((R.PUNCH_CD + R.WHIFF_T) * 60) - 1, `after a whiff the next punch starts at frame ${next}`);
+});
+
+test("the tapped target rides the input: the same inputs, the same run (and a save restores it)", () => {
+  const a = R.createRun(9), b2 = R.createRun(9);
+  for (const r of [a, b2]) r.reset(9, 0, 1);
+  const input = (I, i) => { I[0] = Math.sin(i / 30); I[1] = Math.cos(i / 41); I[3] = i % 70 === 0 ? 1 : 0; if (i % 11 === 0) (I[2] = 1), (I[5] = 1 + (i % 7)); if (i % 17 === 0) (I[4] = 1), (I[5] = R.T_GRAB + (i % R.NG)); if (i % 53 === 0) (I[2] = 1), (I[5] = R.T_MISS); };
+  play(a, 60 * 30, input);
+  play(b2, 60 * 30, input);
+  assert.equal(hash(a), hash(b2), "identical");
+  const c = R.createRun(9);
+  c.reset(9, 0, 1);
+  play(c, 60 * 30, (I, i) => { input(I, i); if (i % 11 === 0) I[5] = 1 + ((i + 1) % 7); });
+  assert.notEqual(hash(a), hash(c), "another target, another run");
 });
 
 test("a live part shocks: health, it lets go and drops", () => {
@@ -264,7 +392,7 @@ test("city after city: flat → the card → the next city (score carried, the K
 test("the same seed and inputs give the same run; a run restores byte for byte from its bytes", () => {
   const a = R.createRun(77), b = R.createRun(77), c = R.createRun(78);
   for (const r of [a, b, c]) r.reset(r === c ? 78 : 77, 0, 1), r.join(1, 1);
-  const input = (I, i) => { I[0] = Math.sin(i / 40); I[1] = Math.cos(i / 55); I[2] = i % 17 === 0 ? 1 : 0; I[3] = i % 90 === 0 ? 1 : 0; I[4] = i % 33 === 0 ? 1 : 0; I[5] = Math.sin(i / 23); I[7] = i % 13 === 0 ? 1 : 0; };
+  const input = (I, i) => { I[0] = Math.sin(i / 40); I[1] = Math.cos(i / 55); I[2] = i % 17 === 0 ? 1 : 0; I[3] = i % 90 === 0 ? 1 : 0; I[4] = i % 33 === 0 ? 1 : 0; I[6] = Math.sin(i / 23); I[8] = i % 13 === 0 ? 1 : 0; I[5] = i % 29 === 0 ? 1 + (i % 7) : i % 31 === 0 ? 8 + (i % 24) : 0; };
   play(a, 60 * 40, input);
   play(b, 60 * 40, input);
   play(c, 60 * 40, input);
@@ -289,18 +417,18 @@ test("players take the rivals from the AI (and give them back)", () => {
   run.reset(3, 0, 0);
   assert.equal(run.MV[CRAB][24], OUT, "rivals off");
   run.join(CRAB, 1);
-  play(run, 2, (I) => (I[5] = 1));
+  play(run, 2, (I) => (I[6] = 1));
   assert.equal(run.MV[CRAB][24], IN, "P2 brings SHARDCLAW in");
   assert.equal(run.MV[CRAB][28], 1);
   const x = run.MV[CRAB][0];
-  play(run, 30, (I) => (I[5] = -1));
+  play(run, 30, (I) => (I[6] = -1));
   assert.ok(run.MV[CRAB][0] < x, "P2 drives it");
   run.join(CRAB, AI);
   assert.equal(run.MV[CRAB][28], AI, "back to the AI");
 });
 
 test("the run allocates nothing per step", async () => {
-  const run = R.createRun(20261116), I = new Float64Array(20), A = new Float64Array(5);
+  const run = R.createRun(20261116), I = new Float64Array(24), A = new Float64Array(6);
   const go = (n) => {
     for (let i = 0; i < n; i++) {
       if (run.S[0] === DONE) run.reset(20261116, (i / 600) % NCITY | 0, 1);

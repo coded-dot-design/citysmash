@@ -12,23 +12,25 @@ import { join, hash32 } from "@fzlt/core/presence";
 import type { Look } from "./monster.ts";
 
 /** Input bits: the stick x and y (4 bits each, 8 the middle), punch (8), jump (9), grab (10), the seat
- *  left (11), six bits of the ape's look (24–29, the first frames only, from seat 0). */
+ *  left (11), the tapped target (12–18: ./round.ts T_*), six bits of the ape's look (24–29, the first
+ *  frames only, from seat 0). */
 export const B_PUNCH = 1 << 8, B_JUMP = 1 << 9, B_GRAB = 1 << 10, B_GONE = 1 << 11;
-export const SEATS = 4, NAME = 8, LOOK_FRAMES = 4;
+export const SEATS = 4, NAME = 8, LOOK_FRAMES = 4, NI = 6;
 const q4 = (v: number) => Math.max(1, Math.min(15, Math.round(v * 7) + 8));
 
-/** Pack one seat's numbers (mx, my, punch, jump, grab) into 32 bits. */
+/** Pack one seat's numbers (mx, my, punch, jump, grab, target) into 32 bits. */
 export function encode(I: Float64Array, o: number, flags = 0) {
-  return (q4(I[o]!) | (q4(I[o + 1]!) << 4) | (I[o + 2] ? B_PUNCH : 0) | (I[o + 3] ? B_JUMP : 0) | (I[o + 4] ? B_GRAB : 0) | flags) >>> 0;
+  return (q4(I[o]!) | (q4(I[o + 1]!) << 4) | (I[o + 2] ? B_PUNCH : 0) | (I[o + 3] ? B_JUMP : 0) | (I[o + 4] ? B_GRAB : 0) | ((I[o + 5]! & 127) << 12) | flags) >>> 0;
 }
-/** Unpack seat s's bits into IN (5 a seat): every screen decodes the same bits the same way. */
+/** Unpack seat s's bits into IN (NI a seat): every screen decodes the same bits the same way. */
 export function decode(bits: number, s: number, IN: Float64Array) {
-  const o = s * 5;
+  const o = s * NI;
   IN[o] = bits & 15 ? ((bits & 15) - 8) / 7 : 0;
   IN[o + 1] = (bits >>> 4) & 15 ? (((bits >>> 4) & 15) - 8) / 7 : 0;
   IN[o + 2] = bits & B_PUNCH ? 1 : 0;
   IN[o + 3] = bits & B_JUMP ? 1 : 0;
   IN[o + 4] = bits & B_GRAB ? 1 : 0;
+  IN[o + 5] = (bits >>> 12) & 127;
 }
 /** A seat that left plays these bits from the frame after its last input (every screen the same). */
 export const GONE = B_GONE >>> 0;

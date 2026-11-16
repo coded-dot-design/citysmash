@@ -12,12 +12,12 @@ const { memory } = await import("@fzlt/core/presence");
 const { encode, decode, hashOf, rollback, GONE, B_GONE, lookBits, takeLook, lookOf, LOOK_FRAMES, packMode, unpackMode } = N;
 
 /** Seat p's scripted numbers on frame f (its own pattern: only it would know it). */
-const I5 = new Float64Array(5);
+const I5 = new Float64Array(6);
 const script = (f, p) => {
-  I5[0] = Math.sin(f / (37 + p * 11) + p); I5[1] = Math.cos(f / (29 + p * 7)); I5[2] = f % (13 + p) === 0 ? 1 : 0; I5[3] = f % (90 + p * 5) === 0 ? 1 : 0; I5[4] = f % 41 === 0 ? 1 : 0;
+  I5[0] = Math.sin(f / (37 + p * 11) + p); I5[1] = Math.cos(f / (29 + p * 7)); I5[2] = f % (13 + p) === 0 ? 1 : 0; I5[3] = f % (90 + p * 5) === 0 ? 1 : 0; I5[4] = f % 41 === 0 ? 1 : 0; I5[5] = f % 23 === 0 ? 1 + (f % 66) : 0;
   return encode(I5, 0);
 };
-const IN = new Float64Array(20);
+const IN = new Float64Array(24);
 /** A run for P seats (seat k drives monster k), from city `ci`. */
 const make = (P, ci = 0, seed = 7) => {
   const r = R.createRun(seed);
@@ -110,7 +110,7 @@ test("rollback over a link with latency and jitter: two and four screens end byt
 });
 
 test("rollback across cities: the autopilot flattens city one and the run moves on, identical on both screens", () => {
-  const P = 2, F = 60 * 75, A = new Float64Array(5);
+  const P = 2, F = 60 * 75, A = new Float64Array(6);
   // Both seats play the autopilot of their own monster on a copy of the run (the same numbers everywhere).
   const ref = make(P), sim = make(P), inp = new Uint32Array(P), inputs = [[], []];
   for (let f = 0; f < F; f++) {

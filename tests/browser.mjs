@@ -1,12 +1,15 @@
 // CitySmash in Chromium (dist/citysmash.mjs on a plain page): the title mounts and settles with no
 // audio; the garage dresses the ape (a fur, a locked part refused with a note, the save code); PLAY
-// mounts Port Lumen, a key starts it; the ape hangs on a wall and three presses of Space make a hole
-// in the window by the hand; L eats the person at the window; one more hole and the building shakes and
+// mounts Port Lumen, a key starts it; the ape hangs on a wall: a click on a window in reach chips it, a
+// click out of reach is a whiff (a swing, nothing hit), two presses of J (the keyboard fallback) make the
+// hole; a click on a person in reach eats them, L eats the next; one more hole and the building shakes and
 // pancakes to rubble; the city flat brings the card and a punch loads city 2 (Coilworth), its unlocks
 // saved; the garage change and the cleared city survive a reload; a comma brings player two in as
-// SHARDCLAW and the arrows drive it; Recall gives the page back byte for byte. At 390 (touch): the pad
-// shows, its keys are 44 px or more, the play surface has touch-action none, the stick walks the ape and
-// PUNCH punches. Waits on state, never time.
+// SHARDCLAW and the arrows drive it; Recall gives the page back byte for byte. At 390 (touch): the pad is
+// the stick and JUMP only, its keys are 44 px or more, the play surface has touch-action none, the stick
+// walks the ape, a tap on a window in reach chips it, a tap out of reach whiffs, a tap on a person in reach
+// eats them; portrait and landscape, every city's tallest building and the street fit the stage under
+// the HUD. Waits on state, never time.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
@@ -19,6 +22,13 @@ const browser = await chromium.launch(launchOptions());
 const until = (p, fn, arg, what, timeout = 20000) => p.waitForFunction(fn, arg, { timeout, polling: 50 }).catch(() => assert.fail(`${what}: timed out`));
 const sr = "document.querySelector('[data-fizlet-host]').shadowRoot";
 const st = (p) => p.evaluate(() => game.scene?.state);
+/** Window (b, fl, col)'s centre on the page. */
+const winXY = (p, b, fl, col) => p.evaluate(([b, fl, col]) => {
+  const sc = game.scene, r = sc.run, cv = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector("canvas.cs-canvas").getBoundingClientRect();
+  const q = sc.project(r.BLD[b * 4] + col + 0.5, r.yOff(b) + fl + 0.5, 0.05), k = cv.width / cv.width;
+  return [cv.left + q[0] * k, cv.top + q[1] * k];
+}, [b, fl, col]);
+const hits = (p) => p.evaluate(() => game.scene.run.HIT.reduce((a, v) => a + v, 0));
 /** Hang the ape on building b's side s with its hand at floor fl (and keep the army away). */
 const hang = (p, b, s, fl) => p.evaluate(([b, s, fl]) => {
   const r = game.scene.run, M = r.M;
@@ -54,25 +64,44 @@ try {
   await p.keyboard.down("d");
   await until(p, () => game.scene.state.phase === 1, null, "a key starts it");
   await p.keyboard.up("d");
-  // On a wall: three presses of Space, a hole in the window by the hand.
+  // On a wall: a click on the far window in reach chips it; a click four windows in is out of reach (a whiff).
   await hang(p, 1, -1, 3);
+  await p.evaluate(() => game.scene.run.LIVE.fill(0));
+  await p.waitForTimeout(200);
+  const far = await p.evaluate(() => { const r = game.scene.run; return r.C0[1] + 3 * r.BLD[1 * 4 + 1] + 2; });
+  let xy = await winXY(p, 1, 3, 2);
+  await p.mouse.click(xy[0], xy[1]);
+  await until(p, (c) => game.scene.run.HIT[c] === 1 && game.scene.run.M[8] === 0, far, "a click in reach: the far window chips");
+  const h0 = await hits(p);
+  xy = await winXY(p, 1, 3, 3);
+  await p.mouse.click(xy[0], xy[1]);
+  await until(p, () => game.scene.run.M[8] > 0, null, "out of reach: a swing");
+  await until(p, () => game.scene.run.M[8] === 0, null, "the swing ends");
+  assert.equal(await hits(p), h0, "out of reach: nothing hit");
+  // The keyboard fallback (J): the window by the hand, chip, crack, hole.
   const cell = await p.evaluate(() => { const r = game.scene.run; return r.C0[1] + 3 * r.BLD[1 * 4 + 1]; });
   for (let n = 0; n < 3; n++) {
-    await p.keyboard.press("Space");
+    await p.keyboard.press("j");
     await until(p, ([c, n]) => game.scene.run.HIT[c] >= n + 1 && game.scene.run.M[8] === 0, [cell, n], `punch ${n + 1}`);
   }
   assert.equal(await p.evaluate((c) => game.scene.run.cell[c], cell), 0, "a hole");
-  // L eats the person at the window.
+  // A click on a person at a window in reach: eaten. Then L eats the next one by the hand.
   await hang(p, 1, -1, 4);
+  await p.evaluate(() => { const r = game.scene.run; r.occ[r.C0[1] + 4 * r.BLD[5] + 1] = 1; });
+  await p.waitForTimeout(200);
+  xy = await winXY(p, 1, 4, 1);
+  await p.mouse.click(xy[0], xy[1]);
+  await until(p, () => game.scene.state.snacks >= 1, null, "a click eats the person in reach");
+  await p.waitForTimeout(500);
   await p.evaluate(() => { const r = game.scene.run; r.occ[r.C0[1] + 4 * r.BLD[5]] = 1; });
   await p.keyboard.press("l");
-  await until(p, () => game.scene.state.snacks >= 1, null, "nom");
+  await until(p, () => game.scene.state.snacks >= 2, null, "nom");
   // One hole short, then the last: it shakes and pancakes to rubble.
   await hang(p, 1, -1, 2);
   await p.evaluate(() => { const r = game.scene.run; r.B[1 * 6 + 1] = r.bk.NEED[1] - 1; });
   const c2 = cell - 5;
   for (let n = 0; n < 3; n++) {
-    await p.keyboard.press("Space");
+    await p.keyboard.press("j");
     await until(p, ([c, n]) => game.scene.run.HIT[c] >= n + 1 && game.scene.run.M[8] === 0, [c2, n], `last hole, punch ${n + 1}`);
   }
   await until(p, () => game.scene.run.B[6] >= 1, null, "it shakes");
@@ -104,18 +133,18 @@ try {
   assert.deepEqual(errs, [], "no page errors");
   await ctx.close();
 
-  // Phone: the pad, 44 px keys, touch-action none, the stick walks, PUNCH punches.
+  // Phone: the pad (the stick and JUMP only), 44 px keys, touch-action none, the stick walks, taps smash and grab.
   const ph = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const q = await ph.newPage();
   await q.goto(server.url + "/");
   await until(q, () => window.game, null, "phone: mounts");
   await q.evaluate(() => game.play(0));
   await until(q, () => game.scene?.state.drawn, null, "phone: draws");
-  const m = await q.evaluate(`(() => { const r = ${sr}; const keys = [...r.querySelectorAll('.cs-key, .cs-pad button')].filter((b) => b.offsetParent).map((b) => { const k = b.getBoundingClientRect(); return Math.min(k.width, k.height); }); return { pad: !!r.querySelector('.cs-pad').offsetParent, keys, touch: getComputedStyle(r.querySelector('.cs-play')).touchAction }; })()`);
+  const m = await q.evaluate(`(() => { const r = ${sr}; const keys = [...r.querySelectorAll('.cs-key, .cs-pad button')].filter((b) => b.offsetParent).map((b) => { const k = b.getBoundingClientRect(); return Math.min(k.width, k.height); }); const acts = [...r.querySelectorAll('.cs-pad button')].filter((b) => b.offsetParent).map((b) => b.getAttribute('aria-label') || b.textContent); return { pad: !!r.querySelector('.cs-pad').offsetParent, keys, acts, touch: getComputedStyle(r.querySelector('.cs-play')).touchAction }; })()`);
   assert.ok(m.pad, "phone: the pad shows");
-  assert.ok(m.keys.length >= 5 && m.keys.every((k) => k >= 44), `phone: keys ≥ 44 px (${m.keys.join(", ")})`);
+  assert.ok(m.acts.some((a) => /jump/i.test(a)) && !m.acts.some((a) => /punch|grab/i.test(a)), `phone: the pad has JUMP and no PUNCH or GRAB (${m.acts.join(" | ")})`);
+  assert.ok(m.keys.length >= 3 && m.keys.every((k) => k >= 44), `phone: keys ≥ 44 px (${m.keys.join(", ")})`);
   assert.equal(m.touch, "none", "phone: touch-action none");
-  const where = await q.evaluate(() => [game.scene.where(0), innerHeight]);
   const stick = await q.evaluate(`(() => { const s = ${sr}.querySelector('.cs-pad .bui-stick, .cs-pad [class*=stick]'); const b = s.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })()`);
   const hx = await q.evaluate(() => game.scene.run.M[0]);
   await q.mouse.move(stick[0], stick[1]);
@@ -123,18 +152,48 @@ try {
   await q.mouse.move(stick[0] + 40, stick[1], { steps: 4 });
   await until(q, (hx) => game.scene.state.phase === 1 && game.scene.run.M[0] > hx + 1, hx, "phone: the stick walks");
   await q.mouse.up();
-  const punch = await q.evaluate(`(() => { const b = [...${sr}.querySelectorAll('.cs-pad button')].find((x) => /Punch/.test(x.getAttribute('aria-label') || x.textContent)).getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })()`);
-  const n0 = await q.evaluate(() => game.scene.run.M[9]);
-  await q.touchscreen.tap(punch[0], punch[1]);
-  await until(q, () => game.scene.run.M[8] > 0 || game.scene.run.M[9] > 0, n0, "phone: PUNCH punches");
-  // The hero on a wall is a quarter of the stage or more.
+  // On a wall: a tap on the medium window chips it; a tap out of reach whiffs; a tap on a person in reach eats.
   await hang(q, 1, -1, 3);
-  await q.waitForTimeout(400);
+  await q.evaluate(() => game.scene.run.LIVE.fill(0));
+  await q.waitForTimeout(300);
+  const mid = await q.evaluate(() => { const r = game.scene.run; return r.C0[1] + 3 * r.BLD[1 * 4 + 1] + 1; });
+  let t = await winXY(q, 1, 3, 1);
+  await q.touchscreen.tap(t[0], t[1]);
+  await until(q, (c) => game.scene.run.HIT[c] === 1 && game.scene.run.M[8] === 0, mid, "phone: a tap in reach chips the window");
+  const q0 = await hits(q);
+  t = await winXY(q, 1, 1, 1);
+  await q.touchscreen.tap(t[0], t[1]);
+  await until(q, () => game.scene.run.M[8] > 0, null, "phone: out of reach, a swing");
+  await until(q, () => game.scene.run.M[8] === 0, null, "phone: the swing ends");
+  assert.equal(await hits(q), q0, "phone: out of reach, nothing hit");
+  await q.evaluate(() => { const r = game.scene.run; r.occ[r.C0[1] + 4 * r.BLD[5]] = 1; });
+  await q.waitForTimeout(100);
+  t = await winXY(q, 1, 4, 0);
+  const s0 = await q.evaluate(() => game.scene.state.snacks);
+  await q.touchscreen.tap(t[0], t[1]);
+  await until(q, (s0) => game.scene.state.snacks > s0, s0, "phone: a tap on a person in reach eats them");
+  // The hero on a wall is a quarter of the stage or more.
   const big = await q.evaluate(() => { const c = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector("canvas.cs-canvas").getBoundingClientRect(); const [, , s] = game.scene.where(0); return (s * 4.3) / c.height; });
-  assert.ok(big >= 0.24, `phone: the hero on a wall is ${Math.round(big * 100)}% of the stage's height`);
-  void where;
+  // (A fifth or more: the city's full height wins over a quarter on a tall phone.)
+  assert.ok(big >= 0.2, `phone: the hero on a wall is ${Math.round(big * 100)}% of the stage's height`);
+  // Full height: every city's tallest building (its roof and crown) and the street, inside the stage under the HUD, portrait and landscape.
+  for (const [w, h] of [[390, 844], [844, 390]]) {
+    await q.setViewportSize({ width: w, height: h });
+    for (let ci = 0; ci < 7; ci++) {
+      await q.evaluate((ci) => { const r = game.scene.run; r.loadCity(ci); }, ci);
+      await q.waitForTimeout(250);
+      const f = await q.evaluate(() => {
+        const sc = game.scene, r = sc.run, root = document.querySelector("[data-fizlet-host]").shadowRoot, cv = root.querySelector("canvas.cs-canvas").getBoundingClientRect(), hud = root.querySelector(".cs-hud").firstElementChild.getBoundingClientRect();
+        let b = 0;
+        for (let k = 0; k < r.nb(); k++) if (r.BLD[k * 4 + 2] > r.BLD[b * 4 + 2]) b = k;
+        const x = r.BLD[b * 4] + r.BLD[b * 4 + 1] / 2, top = sc.project(x, r.top(b) + (r.city().crown === 6 && b === r.city().landmark ? 4 : 0), -3), street = sc.project(x, 0, 5.6);
+        return { top: cv.top + top[1], street: cv.top + street[1], hud: hud.bottom, bottom: cv.bottom, city: r.city().name };
+      });
+      assert.ok(f.top >= f.hud - 2 && f.street <= f.bottom + 1, `${w}×${h} ${f.city}: the tallest building and the street fit (roof ${f.top.toFixed(0)} under the HUD ${f.hud.toFixed(0)}, street ${f.street.toFixed(0)} ≤ ${f.bottom.toFixed(0)})`);
+    }
+  }
   await ph.close();
-  console.log("CitySmash: browser green (title settles, garage + lock + code, start, climb + punch to a hole, eat, a building falls, city 2 loads, unlocks saved, 2P joins, reload persists, Recall, phone pad + stick + PUNCH, hero ≥ 1/4).");
+  console.log("CitySmash: browser green (title settles, garage + lock + code, start, climb + punch to a hole, eat, a building falls, city 2 loads, unlocks saved, 2P joins, reload persists, Recall, phone pad stick + JUMP, taps smash, whiff and eat, hero ≥ 1/5, full height at 390 portrait and landscape).");
 } finally {
   await browser.close();
   await server.close();

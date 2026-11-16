@@ -1,7 +1,7 @@
 // The built site (artifacts/pages, `npm run site:build` first) in Chromium, at 1440 and 390, dark and
 // light: the landing hero is the game's attract run (drawn, the ape smashing, its HUD hidden) with the
 // title, the hook and a PLAY link to /play/; the sections (how to play, the seven cities, the garage,
-// the monsters, play together online, built on Fizlet with the measured size, by Chris Cooley); no
+// the reach diagram (7 punch windows, 12 grab spaces), the monsters, play together online, built on Fizlet with the measured size, by Chris Cooley); no
 // sideways scroll. Reduced motion: the still poster, no game. /play/ mounts the game on its title.
 // SHOTS=<dir> saves a screenshot of each.
 import assert from "node:assert/strict";
@@ -42,6 +42,10 @@ try {
           size: document.getElementById("fizlet").textContent.replace(/\s+/g, " "),
           by: /by Chris Cooley/i.test(document.body.textContent),
           sideways: document.documentElement.scrollWidth > innerWidth,
+          // The reach diagram (from the game's tables): 7 punch windows, 12 grab spaces (8 of them helicopters too), one ape each, a key.
+          reach: [...document.querySelectorAll("#reach .reach-grid")].map((g) => ["punch", "grab", "heli", "ape"].map((k) => g.querySelectorAll(`[data-cell="${k}"]`).length)),
+          reachKey: document.querySelectorAll("#reach .reach-key li").length,
+          reachSeen: [...document.querySelectorAll("#reach .reach-grid")].every((g) => g.getBoundingClientRect().width > 200),
         };
       });
       assert.equal(m.theme, theme, `${at}: the theme`);
@@ -51,6 +55,8 @@ try {
       assert.ok(m.playSize && m.sections && m.worlds === 7 && m.by, `${at}: PLAY ≥ 44 px, six sections, seven cities, by Chris Cooley`);
       assert.ok(m.size.includes(`${gz.toLocaleString("en-US")} bytes gzip`), `${at}: the measured size (${gz} B)`);
       assert.equal(m.sideways, false, `${at}: no sideways scroll`);
+      assert.deepEqual(m.reach, [[7, 0, 0, 1], [0, 4, 8, 1]], `${at}: the reach diagram: 7 punch windows, 12 grab spaces (8 with helicopters)`);
+      assert.ok(m.reachKey === 6 && m.reachSeen, `${at}: the diagram's key and size`);
       if (SHOTS) {
         await p.screenshot({ path: `${SHOTS}/landing-${w}-${theme}.png` });
         if (!touch) await p.screenshot({ path: `${SHOTS}/landing-${w}-${theme}-full.png`, fullPage: true });
