@@ -21,7 +21,7 @@ export const HITS_CRACK = 2, HITS_HOLE = 3;
 /** The street: the gap between buildings, the depth of a building. */
 export const GAP = 2.6, DEPTH = 3, STREET0 = 0.9, STREET1 = 5.6;
 /** Hanging on a side: the monster's x from the wall. */
-export const WALLX = 1.0;
+export const WALLX = 1.3;
 
 export interface Hooks {
   rnd(): number;

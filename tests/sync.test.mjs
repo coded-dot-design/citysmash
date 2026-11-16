@@ -111,19 +111,19 @@ test("rollback over a link with latency and jitter: two and four screens end byt
 
 test("rollback across cities: the autopilot flattens city one and the run moves on, identical on both screens", () => {
   const P = 2, F = 60 * 75, A = new Float64Array(5);
-  // Seat 0 plays the autopilot of its own screen's run (the same run everywhere, so the same numbers).
-  const ref = make(P);
-  const auto = (f) => (f === 0 ? encode(new Float64Array([1, 0, 0, 0, 0]), 0) : (ref.autopilot(A, 0), encode(A, 0)));
-  const inputs = [];
-  const sim = make(P), inp = new Uint32Array(P);
+  // Both seats play the autopilot of their own monster on a copy of the run (the same numbers everywhere).
+  const ref = make(P), sim = make(P), inp = new Uint32Array(P), inputs = [[], []];
   for (let f = 0; f < F; f++) {
     ref.bytes.forEach((v, i) => v.set(sim.bytes[i]));
-    inp[0] = auto(f); inp[1] = script(f, 1);
-    inputs.push(inp[0]);
+    for (let s = 0; s < P; s++) {
+      if (f === 0) A.fill(0), (A[0] = 1);
+      else ref.autopilot(A, s);
+      inputs[s].push((inp[s] = encode(A, 0)));
+    }
     frame(sim, inp, P);
   }
   assert.ok(sim.S[16] >= 1, `the run moved on to city ${sim.S[16] + 1}`);
-  const runs = online(P, F, 0, { latency: 6, jitter: 4, seed: 5, input: (f, s) => (s === 0 ? inputs[f] ?? 0 : script(f, 1)) });
+  const runs = online(P, F, 0, { latency: 6, jitter: 4, seed: 5, input: (f, s) => inputs[s][f] ?? 0 });
   drive(runs, F);
   for (const r of runs) assert.ok(r.rb.final === F && r.rb.desync === -1 && same(r.sim, sim), "identical across the city change");
   for (const r of runs) r.e.destroy();

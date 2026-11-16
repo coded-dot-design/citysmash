@@ -7,4 +7,5 @@
 - The hero ape and three rival giants of our own: SHARDCLAW (a crystal crab-beast), GLOOPMAW (a tentacle blob), VOLTWING (a storm moth).
 - Garage: twelve furs, five patterns, five faces, eight pieces of gear, eight neon trims on a live turntable; cities unlock parts; one profile saved on the device (versioned) with a `CS1-` save code.
 - One to four players on one screen (keyboard halves and gamepads) and online rooms (rollback over fizlet-rooms, invite codes, the host is the ape); a shared score and one each.
+- The daily's climb and damage pass (fizlet 777505d8) synced in: on a wall the monster faces it, the inside arm grips the corner, the feet plant with bent knees, a punch leans out; every hit shows a growing scar, spreading cracks, dents, facade bits that stay as rubble, a lean towards the damage; a punch flash, a camera nudge and (on one screen) a 3-frame hit-stop.
 - Site: landing page with the game as the hero, /play/.
