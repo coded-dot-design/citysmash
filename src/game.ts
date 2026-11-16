@@ -101,8 +101,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
       Object.assign(pdio.cam, { yaw: 0, pitch: 0.14, dist: 14, tx: 0, ty: 2.3, tz: 0, ox: 0, oy: 0, fov: 0.5 });
     }
     if (pvMon) {
-      pvMon.pose(PM, engine.time, 1);
-      pvMon.root.rot[1] = turn;
+      pvMon.pose(PM, engine.time, 1, turn);
       pdio.draw();
     }
   }
