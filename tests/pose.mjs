@@ -155,6 +155,9 @@ try {
             }
             return px;
           };
+          // The windows fill with people again while the camera settles (and a hole's parachutes drift down): a waving
+          // figure in a reach cell changes between the frames below and would read as cover. Clear them before measuring.
+          r.occ.fill(0); r.CH.fill(0);
           step(1);
           const on = shot();
           // Without it: its body group faded out (the camera, which follows the monsters in play, stays put).
