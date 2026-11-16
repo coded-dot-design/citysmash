@@ -1,0 +1,20 @@
+---
+// CitySmash, the game: the stage fills the screen under the header. An invite link
+// (?mode=online&room=…&code=…) drops the player straight into that room.
+import Base from '../../layouts/Base.astro';
+import { ROOMS } from '../../site';
+const description = 'Play CitySmash: a giant cyber ape climbs and smashes seven tabletop cities. Dress him in the garage, play with friends on one screen or online.';
+---
+<Base title="Play CitySmash" description={description} page="play" app>
+  <section class="play-stage" aria-labelledby="play-title">
+    <h1 id="play-title" class="sr">Play CitySmash</h1>
+    <div id="game" class="play-host" data-rooms={ROOMS}></div>
+  </section>
+</Base>
+
+<script>
+  import { createCitySmash } from "../../../../dist/citysmash.mjs";
+  const host = document.getElementById("game")!;
+  const game = createCitySmash({ host, rooms: host.dataset.rooms });
+  (window as unknown as { game: unknown }).game = game;
+</script>

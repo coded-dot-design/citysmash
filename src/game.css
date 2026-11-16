@@ -1,0 +1,139 @@
+/* CitySmash: the run (the gallery daily's stickers: a chip per monster with who drives it, its health
+   and score, the city, the team's score and how much is flat; a line of help, the calls, the keys,
+   the card between cities, the run's card; the pad under the city when the stage is square or tall)
+   and the shell's screens (the title, the garage with its turntable, online rooms). Board UI tokens
+   from the kit; flat colours, bold rims, hard shadows. */
+.cs{position:absolute;inset:0;overflow:hidden;background:#0c0a1a;font:900 14px/1.2 ui-rounded,"SF Pro Rounded",Nunito,system-ui,sans-serif;color:var(--ink);touch-action:none;-webkit-user-select:none;user-select:none}
+.bui[data-theme="light"] .cs{background:#c9a585}
+.cs [hidden]{display:none!important}
+.cs .cs-scene-host{position:absolute;inset:0;container:stage/size}
+.cs .cs-canvas,.cs .cs-play{position:absolute;left:0;top:0;width:100%;height:100%}
+.cs .cs-play{border:0;margin:0;padding:0;background:transparent;box-shadow:none;transition:none;cursor:crosshair;touch-action:none;-webkit-tap-highlight-color:transparent;outline-offset:-4px;pointer-events:auto}
+.cs .cs-play:focus-visible{outline:3px solid #22e6ff}
+.cs .cs-hud{position:absolute;inset:0;pointer-events:none;font:900 clamp(10px,1.45cqw,14px)/1.15 ui-rounded,"SF Pro Rounded",Nunito,system-ui,sans-serif}
+.cs .cs-head{position:absolute;left:8px;top:8px;right:110px;display:grid;gap:6px}
+.cs .cs-top,.cs .cs-mons{display:flex;flex-wrap:wrap;gap:6px 8px;margin:0}
+.cs .cs-chip{display:inline-flex;align-items:center;gap:.4em;padding:.4em .7em;background:var(--surface);color:var(--ink);border:2px solid var(--rim);border-radius:8px;box-shadow:calc(3px * var(--bui-sx,1)) calc(3px * var(--bui-sy,1)) 0 var(--bui-shadow,#000);white-space:nowrap;font-variant-numeric:tabular-nums}
+.cs .cs-city{rotate:-1.5deg;background:#ff4fa8;color:#0b0a14;letter-spacing:.04em}
+.cs .cs-city em,.cs .cs-team em,.cs .cs-flat em{font-style:normal;font-size:.8em;letter-spacing:.06em;opacity:.85}
+.cs .cs-flat{background:#ffd166;color:#0b0a14}
+.cs .cs-team span{min-width:4ch}
+.cs .cs-mon{gap:.35em;padding:.28em .55em;font-size:.88em;outline:3px solid var(--seat,transparent);outline-offset:1px}
+.cs .cs-mon i{font-style:normal;padding:0 .3em;border-radius:4px;background:var(--seat,#7a7690);color:#0b0a14}
+.cs .cs-mon:not(.cs-p) i{background:var(--muted);color:var(--surface)}
+.cs .cs-mon em{font-style:normal;letter-spacing:.04em}
+.cs .cs-mon u{display:block;width:4em;height:.65em;border:2px solid var(--rim);border-radius:3px;overflow:hidden;text-decoration:none}
+.cs .cs-mon s{display:block;height:100%;width:100%;background:#39ffb0;text-decoration:none;transition:width .15s}
+.bui[data-theme="light"] .cs .cs-mon s{background:#1fae6e}
+.cs .cs-mon.cs-low s{background:#ff4f5e}
+.cs .cs-mon.cs-out{opacity:.55}
+.cs .cs-hint{min-height:1.2em;margin:0;padding:0 2px;font-size:.92em;color:#f4efff;text-shadow:0 1px 0 #0d0b1c,0 0 4px #0d0b1c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bui[data-theme="light"] .cs .cs-hint{color:#1b1420;text-shadow:0 1px 0 #fff3dc,0 0 4px #fff3dc}
+.cs .cs-toast{position:absolute;left:50%;top:30%;translate:-50% 0;rotate:-2deg;margin:0;padding:.45em .8em;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--rim);color:#f6f3ff;border:2px solid var(--rim);border-radius:8px;box-shadow:calc(4px * var(--bui-sx,1)) calc(4px * var(--bui-sy,1)) 0 var(--bui-shadow,#000);font-size:1.15em;letter-spacing:.03em}
+.cs .cs-toast.cs-clean{background:#22e6ff;color:#0b0a14}
+.cs .cs-toast.cs-go{background:#39ffb0;color:#0b0a14}
+.cs .cs-toast.cs-meh{background:#ffd166;color:#0b0a14}
+.cs .cs-toast.cs-bad{background:#ff4f5e;color:#0b0a14;rotate:2deg}
+.cs .cs-live{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);margin:0}
+.cs .cs-keys{position:absolute;right:8px;top:8px;display:flex;gap:6px;margin:0}
+.cs .cs-key{min-width:44px;height:44px;padding:0 .7em;font:inherit;cursor:pointer;pointer-events:auto;background:var(--surface);color:var(--ink);border:2px solid var(--rim);border-radius:22px;box-shadow:calc(3px * var(--bui-sx,1)) calc(3px * var(--bui-sy,1)) 0 var(--bui-shadow,#000)}
+.cs .cs-card{position:absolute;left:50%;top:48%;translate:-50% -50%;rotate:-1.5deg;display:grid;justify-items:center;gap:.45em;width:min(88%,30em);padding:.9em 1.1em 1em;background:var(--surface);color:var(--ink);border:2.5px solid var(--rim);border-radius:12px;box-shadow:calc(6px * var(--bui-sx,1)) calc(6px * var(--bui-sy,1)) 0 var(--bui-shadow,#000);text-align:center;pointer-events:auto}
+.cs .cs-card>b{font-size:1.9em;letter-spacing:.05em}
+.cs .cs-card>small{letter-spacing:.1em;color:var(--muted)}
+.cs .cs-card p{margin:0}
+.cs .cs-card .cs-t{font-size:1.2em;font-variant-numeric:tabular-nums}
+.cs .cs-card .cs-next{color:var(--muted);line-height:1.35;font-size:.95em}
+.cs .cs-card .cs-unl{color:#ff4fa8}
+.cs .cs-card .cs-unl:empty,.cs .cs-card .cs-go-say:empty{display:none}
+.cs .cs-card .cs-go-say{padding:.2em .6em;background:#ffd166;color:#0b0a14;border-radius:6px;font-size:.9em}
+.cs .cs-card .cs-stats{color:var(--muted);line-height:1.35}
+.cs .cs-board{display:grid;gap:4px;width:100%;margin:0;padding:0;list-style:none}
+.cs .cs-board li{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:0 .5em;padding:.25em .5em;border:2px solid var(--rim);border-radius:8px;text-align:left}
+.cs .cs-board li:first-child{background:#ffd166;color:#0b0a14}
+.cs .cs-board i{font-style:normal;font-size:.8em;padding:0 .35em;border:1.5px solid currentColor;border-radius:4px}
+.cs .cs-board span{font-variant-numeric:tabular-nums}
+.cs .cs-board em{grid-column:2 / 4;font-style:normal;font-size:.78em;opacity:.75}
+.cs .cs-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0}
+.cs .cs-row .bui-key{min-height:44px;padding:0 1.1em;font:inherit}
+.cs .cs-pad{--u:.62px;display:none}
+.cs .cs-pad .bui-pad-keys{max-width:none;flex-wrap:nowrap}
+.cs .cs-pad svg{width:1.5em;height:1.5em;fill:currentColor;stroke:none}
+@media (pointer:coarse){.cs .cs-pad{display:flex}}
+@container stage (aspect-ratio<7/5){
+.cs .cs-scene-host>*{--padh:clamp(104px,24cqh,128px)}
+.cs .cs-canvas,.cs .cs-play{height:calc(100cqh - var(--padh))}
+.cs .cs-hud{font-size:clamp(10px,3.1cqw,13px)}
+.cs .cs-head{right:104px}
+.cs .cs-hint{white-space:normal}
+.cs .cs-mon u{width:2.6em}
+.cs .cs-pad{display:flex;--u:.72px;gap:calc(8 * var(--u));padding-inline:calc(8 * var(--u))}
+.cs .cs-card{top:calc((100cqh - var(--padh)) / 2);font-size:.86em}
+.cs .cs-toast{top:calc((100cqh - var(--padh)) * .42)}
+}
+
+/* ---- the shell's screens ---- */
+.cs .cs-cards{position:absolute;inset:0;overflow:auto;background:radial-gradient(120% 90% at 80% 0%,#3a1a5e 0,#120d2a 55%,#0b0a14 100%);touch-action:pan-y}
+.bui[data-theme="light"] .cs .cs-cards{background:radial-gradient(120% 90% at 80% 0%,#ffd6e8 0,#e8e2ff 55%,#d8ccf4 100%)}
+.cs .cs-screen{min-height:100%;box-sizing:border-box;padding:14px 16px 20px;display:grid;align-content:start;gap:14px}
+.cs .cs-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cs .cs-logo{font-size:1.7em;letter-spacing:.04em;rotate:-2deg;padding:.08em .4em;background:#ffd166;color:#0b0a14;border:2.5px solid var(--rim);border-radius:10px;box-shadow:calc(4px * var(--bui-sx,1)) calc(4px * var(--bui-sy,1)) 0 var(--bui-shadow,#000)}
+.cs .cs-logo i{font-style:normal;color:#d81b72}
+.cs h2{margin:0;font-size:clamp(1.4em,3.2vw,2.2em);line-height:1.05;letter-spacing:.01em}
+.cs .cs-story p,.cs .cs-obody>p{margin:0;max-width:40em;font-weight:700;line-height:1.4;color:var(--muted)}
+.cs .cs-mbody{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+.cs .cs-story{display:grid;gap:12px}
+.cs .cs-actions,.cs .cs-sizes,.cs .cs-gtabs,.cs .cs-hostjoin{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.cs .cs-actions .bui-key,.cs .cs-sizes .bui-key,.cs .cs-gtabs .bui-key,.cs .cs-hostjoin .bui-key,.cs .cs-rooms .bui-key{min-height:44px;min-width:44px;padding:0 1em;font:inherit}
+.cs .cs-big{font-size:1.15em;padding:0 1.4em!important}
+.cs .cs-sub{margin:0;font-size:.82em;letter-spacing:.1em;color:var(--muted)}
+.cs [aria-pressed="true"].bui-key{background:#22e6ff;color:#0b0a14}
+.cs .cs-who{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0;padding:0;list-style:none}
+.cs .cs-who li{display:grid;grid-template-columns:auto 1fr;gap:0 .5em;align-items:center;padding:.4em .55em;background:var(--surface);border:2px solid var(--rim);border-radius:9px;opacity:.5}
+.cs .cs-who li.cs-in{opacity:1;outline:3px solid var(--seat);outline-offset:1px}
+.cs .cs-who i{font-style:normal;padding:0 .35em;border-radius:4px;background:var(--seat);color:#0b0a14;grid-row:span 2}
+.cs .cs-who small{font-size:.72em;color:var(--muted);letter-spacing:.04em}
+.cs .cs-cities{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.cs .cs-cityk{width:100%;min-height:64px;display:grid;justify-items:start;gap:2px;padding:.55em .7em;font:inherit;text-align:left}
+.cs .cs-cityk small{font-size:.7em;letter-spacing:.1em;opacity:.8}
+.cs .cs-cityk span{font-size:.74em;opacity:.85}
+.cs .cs-cityk[disabled]{opacity:.45}
+.cs .cs-note{margin:0;padding:.5em .7em;background:#ffd166;color:#0b0a14;border:2px solid var(--rim);border-radius:8px;max-width:36em}
+.cs .cs-gbody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+.cs .cs-gview{position:relative;display:grid;justify-items:center;gap:8px}
+.cs .cs-pvwrap{width:100%;aspect-ratio:1 / 1;max-height:60vh;border:2.5px solid var(--rim);border-radius:14px;overflow:hidden;box-shadow:calc(5px * var(--bui-sx,1)) calc(5px * var(--bui-sy,1)) 0 var(--bui-shadow,#000)}
+.cs .cs-preview{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+.cs .cs-mname{font-size:1.3em;letter-spacing:.06em;rotate:-1.5deg;padding:.1em .5em;background:#ff4fa8;color:#0b0a14;border:2px solid var(--rim);border-radius:8px}
+.cs .cs-gside{display:grid;gap:12px}
+.cs .cs-opts{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.cs .cs-opt{min-width:44px;min-height:44px;padding:0 .8em;font:inherit;font-size:.92em;display:inline-flex;align-items:center;gap:.4em}
+.cs .cs-opt small{font-size:.7em;opacity:.8}
+.cs .cs-opt[data-locked]{opacity:.55;border-style:dashed}
+.cs .cs-sw i{display:block;width:1.2em;height:1.2em;border-radius:50%;background:var(--c);border:2px solid var(--rim)}
+.cs .cs-code{display:grid;gap:6px}
+.cs .cs-code textarea{font:600 12px/1.3 ui-monospace,Menlo,monospace;padding:.5em;border:2px solid var(--rim);border-radius:8px;background:var(--surface);color:var(--ink);resize:vertical;word-break:break-all}
+.cs .cs-code .bui-key{justify-self:start;min-height:44px;padding:0 1em;font:inherit}
+.cs .cs-obody{display:grid;gap:12px;max-width:44em}
+.cs .cs-field{display:grid;gap:4px;font-size:.8em;letter-spacing:.1em;color:var(--muted)}
+.cs .cs-field input{font:800 16px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;padding:.6em .7em;min-height:44px;box-sizing:border-box;border:2px solid var(--rim);border-radius:8px;background:var(--surface);color:var(--ink);max-width:22em}
+.cs .cs-hostjoin .bui-key{display:grid;justify-items:start;padding:.4em 1em;text-align:left}
+.cs .cs-hostjoin small{font-size:.7em;opacity:.8}
+.cs .cs-say{margin:0;min-height:1.2em;color:#ff4fa8}
+.cs .cs-big2{margin:0;font-size:1.2em}
+.cs .cs-rooms{display:flex;align-items:center;gap:10px;margin:0}
+.cs .cs-rooms output{min-width:2ch;font-size:2em;text-align:center}
+.cs .cs-ticket{display:flex;gap:10px;margin:0}
+.cs .cs-ticket span{display:grid;padding:.4em .8em;background:var(--surface);border:2px solid var(--rim);border-radius:9px}
+.cs .cs-ticket small{font-size:.7em;letter-spacing:.1em;color:var(--muted)}
+.cs .cs-ticket b{font-size:1.4em;letter-spacing:.05em}
+.cs .cs-seats{display:grid;gap:6px;margin:0;padding:0;list-style:none;max-width:26em}
+.cs .cs-seats li{display:grid;grid-template-columns:auto 1fr auto;gap:.5em;align-items:center;padding:.4em .6em;background:var(--surface);border:2px solid var(--rim);border-radius:9px;opacity:.55}
+.cs .cs-seats li.cs-in,.cs .cs-seats li.cs-me{opacity:1}
+.cs .cs-seats li.cs-me{outline:3px solid var(--seat);outline-offset:1px}
+.cs .cs-seats i{display:block;width:1em;height:1em;border-radius:50%;background:var(--seat);border:2px solid var(--rim)}
+.cs .cs-seats small{font-size:.72em;color:var(--muted)}
+@media (max-width:720px){
+.cs .cs-mbody,.cs .cs-gbody{grid-template-columns:1fr}
+.cs .cs-pvwrap{max-height:44vh;aspect-ratio:4 / 3}
+.cs .cs-screen{padding:10px 12px 16px;gap:12px}
+.cs .cs-cities{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

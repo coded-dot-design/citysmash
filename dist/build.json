@@ -1,0 +1,8 @@
+{
+  "version": "0.1.0",
+  "fizlet": "0.25.0",
+  "gzip": {
+    "citysmash.mjs": 72527,
+    "citysmash.js": 72744
+  }
+}
