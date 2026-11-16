@@ -27,6 +27,19 @@ try {
       const sc = game.scene, r = sc.run, out = [];
       sc.engine.stop();
       const step = (n) => { for (let i = 0; i < n; i++) sc.engine.advance(1 / 60); };
+      // Every part (for a part's screen box: its eight corners projected) and whether it hangs off another.
+      const parts = [];
+      sc.dio.recolor((o) => void parts.push(o));
+      const under = (o, g) => { for (let q = o; q; q = q.parent) if (q === g) return true; return false; };
+      const box = (os) => {
+        const b = [1e9, 1e9, -1e9, -1e9];
+        for (const o of os) for (let q = 0; q < 8; q++) {
+          const M = o.M, x = (q & 1 ? 0.5 : -0.5) * o.size[0], y = (q & 2 ? 0.5 : -0.5) * o.size[1], z = (q & 4 ? 0.5 : -0.5) * o.size[2];
+          const v = sc.project(M[9] + M[0] * x + M[1] * y + M[2] * z, M[10] + M[3] * x + M[4] * y + M[5] * z, M[11] + M[6] * x + M[7] * y + M[8] * z);
+          (b[0] = Math.min(b[0], v[0])), (b[1] = Math.min(b[1], v[1])), (b[2] = Math.max(b[2], v[0])), (b[3] = Math.max(b[3], v[1]));
+        }
+        return b;
+      };
       r.S[0] = 1;
       for (let k = 0; k < 4; k++) {
         // Only monster k in play, nothing shooting.
@@ -40,13 +53,21 @@ try {
           M[5] = 2; M[12] = b; M[22] = s; M[0] = r.wallX(b, s); M[2] = -0.55; M[6] = -s; M[1] = fl + 0.5 - 1.9; M[8] = 0; M[33] = 0; M[7] = 100; M[15] = 0; M[23] = 0; M[20] = 0; M[34] = 0; M[11] = 0;
           step(30);
           const edge = s < 0 ? x0 : x0 + wd, g = sc.gripHand(k, -s), n2 = m.hands.length;
-          const c0 = sc.contacts(k), nf0 = c0.slice((n2 + 1 - g) * 3, (n2 + 1 - g) * 3 + 3);
+          const neckO = sc.dio.get(m.root.id + "-neck"), c0 = sc.contacts(k), nf0 = c0.slice((n2 + 1 - g) * 3, (n2 + 1 - g) * 3 + 3);
           // The body: side-on, its front faces the wall, out in the gap and set back behind the front.
           const T = sc.torso(k), fh = Math.hypot(T[3], T[5]), faces = (T[3] / fh) * -s, nk = sc.dio.get(m.root.id + "-neck").M;
           const fh3 = c0.slice(g * 3, g * 3 + 3), ff3 = c0.slice((n2 + g) * 3, (n2 + g) * 3 + 3);
           // The punch at reach cell d (a tap's target): level close, medium, far; up close, medium; down close, medium.
           M[20] = 0.3; M[43] = 1 + d;
           const i = r.reachCell(M, d), RC = [0, 1, 0, 2, 0, 3, 1, 1, 1, 2, -1, 1, -1, 2];
+          // The far punch's wind-up (its last frame before the hit): the body part-way round the corner, towards the
+          // camera; the fist cocked back, away from the window (farther than at rest and at the hit), clear of the head.
+          let wnd = null;
+          if (d === 2) {
+            step(4);
+            const cw = sc.contacts(k), fw = cw.slice((1 - g) * 3, (1 - g) * 3 + 3), hd = box(parts.filter((o) => o.shape !== "group" && under(o, neckO))), fb = box([m.hands[1 - g]]);
+            wnd = { T: sc.torso(k), f: fw, lap: Math.max(0, Math.min(hd[2], fb[2]) - Math.max(hd[0], fb[0])) * Math.max(0, Math.min(hd[3], fb[3]) - Math.max(hd[1], fb[1])), still: M[34] > 0 };
+          }
           let n = 0;
           while (!r.HIT[i] && n++ < 40) step(1);
           const c = sc.contacts(k), hit = c.slice((1 - g) * 3, (1 - g) * 3 + 3), fh1 = c.slice(g * 3, g * 3 + 3), nf = c.slice((n2 + 1 - g) * 3, (n2 + 1 - g) * 3 + 3);
@@ -58,8 +79,10 @@ try {
           const nearer = P(T)[2] - P(T1)[2], across = ((P(T1)[0] - P(T)[0]) * -s) / u, past = ((P([nk[9], nk[10], nk[11]])[0] - P([edge, nk[10], 0])[0]) * -s) / u;
           const [px, py] = sc.where(k), cv = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector("canvas.cs-canvas").getBoundingClientRect();
           const onSide = (q) => (q[0] - edge) * s > -0.3 && (q[0] - edge) * s < 1.2 && q[2] < 0 && q[2] > -2.6;
+          const Cs = P([cx, cy, 0]), far2 = (q) => Math.hypot(P(q)[0] - Cs[0], P(q)[1] - Cs[1]);
+          const wind = wnd && { part: +((P(T)[2] - P(wnd.T)[2]) / (P(T)[2] - P(T1)[2])).toFixed(2), still: wnd.still, lap: +wnd.lap.toFixed(1), fist: [far2(c0.slice((1 - g) * 3, (1 - g) * 3 + 3)), far2(wnd.f), far2(hit)].map((v) => +v.toFixed(1)) };
           out.push({
-            k, s, d, lunge: sc.wall[k].lunge, nearer: +nearer.toFixed(2), across: +across.toFixed(2), past: +past.toFixed(2), hitFrame: r.HIT[i] === 1, cell: col === (s < 0 ? RC[d * 2 + 1] - 1 : wd - RC[d * 2 + 1]), row: row - fl === RC[d * 2],
+            k, s, d, wind, lunge: sc.wall[k].lunge, nearer: +nearer.toFixed(2), across: +across.toFixed(2), past: +past.toFixed(2), hitFrame: r.HIT[i] === 1, cell: col === (s < 0 ? RC[d * 2 + 1] - 1 : wd - RC[d * 2 + 1]), row: row - fl === RC[d * 2],
             onWindow: Math.abs(hit[0] - cx) < 0.55 && Math.abs(hit[1] - cy) < 0.55, inFront: hit[2] > 0,
             faces: +faces.toFixed(2), front: +T[2].toFixed(2), front1: +T1[2].toFixed(2), tx: +((T[0] - edge) * s).toFixed(2),
             farHand: onSide(fh3) && onSide(fh1), farFoot: k === 2 || onSide(ff3),
@@ -93,6 +116,11 @@ try {
         assert.ok(o.front1 > 0, `${at}: at the far hit the torso is in front of the facade (z ${o.front1})`);
         assert.ok(o.across > 0.4, `${at}: the far punch moves the torso across the screen towards the window (${o.across} window widths)`);
         assert.ok(o.past > 0.2, `${at}: at the far hit the head is past the front corner, over the front face (${o.past} window widths)`);
+        const W = o.wind;
+        assert.ok(W.still, `${at}: the far wind-up is measured before the hit frame`);
+        assert.ok(W.part > 0.3 && W.part < 0.8, `${at}: at the far wind-up the torso is already part-way towards the camera (${W.part} of the way to the hit)`);
+        assert.ok(W.fist[1] > W.fist[0] && W.fist[1] > W.fist[2], `${at}: the far wind-up cocks the fist back, farther from the window than at rest and at the hit (px from the window: rest, wind-up, hit ${W.fist})`);
+        assert.ok(W.lap === 0, `${at}: the cocked fist is clear of the head on screen (${W.lap} px² overlap)`);
       }
     }
     // The reach stays clear: at rest and mid-climb, each reach cell's pixels with the monster and without it
