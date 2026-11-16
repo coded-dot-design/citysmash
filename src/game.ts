@@ -469,6 +469,8 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     /** Set a garage part (as a click would). */
     setPart: (k: Part, i: number) => ((profile = setPart(profile, k, i)), keep(), screen === "garage" && paint(), profile.look),
     exportCode: () => exportCode(profile),
+    /** The garage's turntable (tests turn it and check the rig's depth order): its diorama, its rig, a turn. */
+    garage: { dio: pdio, rig: () => pvMon, turn: (t: number) => ((turn = t), (spinTo = 0), preview()) },
     destroy: () => engine.destroy(),
   };
 }

@@ -1856,6 +1856,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     project: (x: number, y: number, z: number) => (dio.project(x, y, z, tmp), [tmp[0]!, tmp[1]!, tmp[2]!]),
     /** Monster k's rig (tests read its joints). */
     rig: (k: number) => mons[k]!,
+    /** The diorama (tests redraw it to check the rigs' depth order). */
+    dio,
     /** The wall table (tests tune and check it). */
     wall: WALL,
     where: (k: number) => (dio.project(MV[k]![0]!, MV[k]![1]! + mons[k]!.height * 0.5, MV[k]![2]!, tmp), [tmp[0]!, tmp[1]!, dio.focal() / tmp[2]!]),
