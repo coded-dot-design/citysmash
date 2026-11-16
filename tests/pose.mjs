@@ -42,7 +42,7 @@ try {
           const edge = s < 0 ? x0 : x0 + wd, g = sc.gripHand(k, -s), n2 = m.hands.length;
           const c0 = sc.contacts(k), nf0 = c0.slice((n2 + 1 - g) * 3, (n2 + 1 - g) * 3 + 3);
           // The body: side-on, its front faces the wall, out in the gap and set back behind the front.
-          const T = sc.torso(k), fh = Math.hypot(T[3], T[5]), faces = (T[3] / fh) * -s;
+          const T = sc.torso(k), fh = Math.hypot(T[3], T[5]), faces = (T[3] / fh) * -s, nk = sc.dio.get(m.root.id + "-neck").M, h0 = [nk[9], nk[10], nk[11]];
           const fh3 = c0.slice(g * 3, g * 3 + 3), ff3 = c0.slice((n2 + g) * 3, (n2 + g) * 3 + 3);
           // The punch at reach cell d (a tap's target): level close, medium, far; up close, medium; down close, medium.
           M[20] = 0.3; M[43] = 1 + d;
@@ -51,10 +51,12 @@ try {
           while (!r.HIT[i] && n++ < 40) step(1);
           const c = sc.contacts(k), hit = c.slice((1 - g) * 3, (1 - g) * 3 + 3), fh1 = c.slice(g * 3, g * 3 + 3), nf = c.slice((n2 + 1 - g) * 3, (n2 + 1 - g) * 3 + 3);
           const rel = i - r.C0[b], row = (rel / wd) | 0, col = rel - row * wd, cx = x0 + col + 0.5, cy = r.yOff(b) + row + 0.5;
+          // The head at the hit against at rest: how much nearer the window it is (the far punch leans into the reach).
+          const hd = (h) => Math.hypot(cx - h[0], cy - h[1], h[2]), toward = hd(h0) - hd([nk[9], nk[10], nk[11]]);
           const [px, py] = sc.where(k), cv = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector("canvas.cs-canvas").getBoundingClientRect();
           const onSide = (q) => (q[0] - edge) * s > -0.3 && (q[0] - edge) * s < 1.2 && q[2] < 0 && q[2] > -2.6;
           out.push({
-            k, s, d, lunge: sc.wall[k].lunge, hitFrame: r.HIT[i] === 1, cell: col === (s < 0 ? RC[d * 2 + 1] - 1 : wd - RC[d * 2 + 1]), row: row - fl === RC[d * 2],
+            k, s, d, lunge: sc.wall[k].lunge, toward: +toward.toFixed(2), hitFrame: r.HIT[i] === 1, cell: col === (s < 0 ? RC[d * 2 + 1] - 1 : wd - RC[d * 2 + 1]), row: row - fl === RC[d * 2],
             onWindow: Math.abs(hit[0] - cx) < 0.55 && Math.abs(hit[1] - cy) < 0.55, inFront: hit[2] > 0,
             faces: +faces.toFixed(2), front: +T[2].toFixed(2), tx: +((T[0] - edge) * s).toFixed(2),
             farHand: onSide(fh3) && onSide(fh1), farFoot: k === 2 || onSide(ff3),
@@ -82,6 +84,7 @@ try {
       assert.ok(o.farFoot, `${at}: the far foot is on the side wall (${o.ff}, edge ${o.edge})`);
       assert.ok(o.nearFoot || lunge, `${at}: the near foot is on the side wall and holds (${o.nf}, edge ${o.edge})`);
       assert.ok(o.seen, `${at}: on screen`);
+      if (o.d === 2) assert.ok(o.toward > 0.5, `${at}: the far punch leans the head forward, towards the window (${o.toward} nearer than at rest)`);
     }
     // The reach stays clear: at rest and mid-climb, each reach cell's pixels with the monster and without it
     // (a margin of 5% for edge anti-aliasing and the city's own flicker; an arm out over a cell covers 60% or more).
@@ -158,7 +161,7 @@ try {
     for (const o of clear) if (!("click" in o)) assert.ok(o.cover <= 0.05, `${w}: monster ${o.k}, side ${o.s}, ${o.climb ? "mid-climb" : "at rest"}: reach cell ${o.d} is clear of the monster (${(o.cover * 100).toFixed(1)}% of it covered)`);
     await p.close();
   }
-  console.log("CitySmash: the rig green (four monsters, both edges, the seven reach cells: side-on on the side wall behind the front, chest to the wall, far hand and feet on the side wall, the fist on the window the round hits, in front; the reach clear of the monster at rest and mid-climb, a click on each cell punches it; at 1440 and 390).");
+  console.log("CitySmash: the rig green (four monsters, both edges, the seven reach cells: side-on on the side wall behind the front, chest to the wall, far hand and feet on the side wall, the fist on the window the round hits, in front; the far punch leans the head towards it; the reach clear of the monster at rest and mid-climb, a click on each cell punches it; at 1440 and 390).");
 } finally {
   await browser.close();
   await server.close();

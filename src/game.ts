@@ -93,9 +93,11 @@ export function createCitySmash(o: CitySmashOptions = {}) {
       pvKey = key;
       pdio.resize(w, h, Math.min(2, devicePixelRatio || 1));
       pdio.clear();
+      // The plinth draws first (under the ape at every turn: the depth sort would put it over the far leg).
+      pdio.cluster("pl", { fixed: 0 });
       const night = pageTheme() === "dark";
-      pdio.add({ shape: "cyl", sides: 10, size: [5.4, 0.3, 5.4], pos: [0, -0.3, 0], color: night ? "#2a2552" : "#d8ccf4", pick: false });
-      pdio.add({ shape: "cyl", sides: 10, size: [5.6, 0.08, 5.6], pos: [0, -0.36, 0], color: night ? "#22e6ff" : "#ff4fa8", emissive: night, pick: false });
+      pdio.add({ shape: "cyl", sides: 10, size: [5.4, 0.3, 5.4], pos: [0, -0.3, 0], color: night ? "#2a2552" : "#d8ccf4", pick: false, cluster: "pl" });
+      pdio.add({ shape: "cyl", sides: 10, size: [5.6, 0.08, 5.6], pos: [0, -0.36, 0], color: night ? "#22e6ff" : "#ff4fa8", emissive: night, pick: false, cluster: "pl" });
       const ink: RigInk = night ? { ink: "#0b0a14", eye: "#fff6c9", pupil: "#0b0a14", teeth: "#f6f3ff", night: true, metal: "#9aa3c8" } : { ink: "#1b1420", eye: "#ffffff", pupil: "#1b1420", teeth: "#ffffff", night: false, metal: "#b8bfd8" };
       pvMon = buildMonster(pdio, 0, profile.look, ink, "pv");
       Object.assign(pdio.cam, { yaw: 0, pitch: 0.14, dist: 14, tx: 0, ty: 2.3, tz: 0, ox: 0, oy: 0, fov: 0.5 });

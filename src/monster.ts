@@ -71,16 +71,16 @@ export interface RigInk { ink: string; eye: string; pupil: string; teeth: string
  *  knee, splay], the free arm at rest, its wind-up and its hit for each reach cell (./round.ts REACH: level
  *  close, medium, far, up close, medium, down close, medium; [swing, splay, elbow] each), the head's turn.
  *  Fitted per kind (tests/pose.mjs checks them). */
-export interface Wall { yaw: number; ox: number; oz: number; lean: number; lunge: number; far: number[]; fleg: number[]; nleg: number[]; rest: number[]; wind: number[]; hit: number[]; neck: number }
+export interface Wall { yaw: number; ox: number; oz: number; lean: number; lunge: number; tilt: number[]; far: number[]; fleg: number[]; nleg: number[]; rest: number[]; wind: number[]; hit: number[]; neck: number }
 export const WALL: Wall[] = [
   // the ape
-  { yaw: 0.1, ox: -0.15, oz: -0.85, lunge: 0.8, lean: 0.15, far: [1.105, -0.541, 2.107], fleg: [0.871, -0.25, -0.006], nleg: [1.033, -0.25, 0.353], rest: [-0.759, -0.108, 1.792], wind: [3.636, -1.51, 2.7, 2.593, 1.631, 2.7, 3.594, -1.652, 2.494, 2.253, 0.442, 2.548, 2.253, 0.442, 2.548, 3.7, -0.421, 2.627, 3.7, -0.421, 2.627], hit: [-0.039, -0.862, 1.586, 1.009, -0.847, 0, 1.042, -0.844, 0, 1.241, 1.407, 1.679, 1.017, -1.615, 0.242, 0.047, -0.489, 0.919, 0.816, -0.443, 0], neck: -1.2 },
+  { yaw: 0.1, ox: -0.15, oz: -0.85, lunge: 0.3, lean: 0.15, tilt: [0.35, 0.35], far: [1.105, -0.541, 2.107], fleg: [0.871, -0.25, -0.006], nleg: [1.033, -0.25, 0.353], rest: [-0.759, -0.108, 1.792], wind: [3.636, -1.51, 2.7, 2.593, 1.631, 2.7, 3.594, -1.652, 2.494, 2.253, 0.442, 2.548, 2.253, 0.442, 2.548, 3.7, -0.421, 2.627, 3.7, -0.421, 2.627], hit: [-0.039, -0.862, 1.586, 1.009, -0.847, 0, 1.042, -2.494, 0.26, 1.241, 1.407, 1.679, 1.017, -1.615, 0.242, 0.047, -0.489, 0.919, 0.816, -0.443, 0], neck: -1.2 },
   // SHARDCLAW
-  { yaw: 0.1, ox: 0.2, oz: -0.7, lunge: 0.9, lean: 0.9, far: [0.111, 0.868, 2.466], fleg: [-0.545, -0.972, 0.259], nleg: [-0.608, -0.717, 0.248], rest: [3.7, 0.063, 2.562], wind: [2.766, 0.41, 2.556, 2.766, 0.41, 2.556, 2.874, 0.213, 2.252, 2.063, 0.236, 2.527, 2.063, 0.236, 2.527, 3.402, 1.154, 2.248, 3.402, 1.154, 2.248], hit: [-0.792, -0.548, 1.668, 0.251, -0.414, 0.105, 0.266, -0.405, 0.105, -0.352, -0.804, 1.915, 0.538, -0.54, 0.3, -0.506, -0.408, 0.451, -0.042, -0.285, 0.105], neck: -0.5 },
+  { yaw: 0.1, ox: 0.2, oz: -0.7, lunge: 0.4, lean: 0.9, tilt: [0.35, 0.35], far: [0.111, 0.868, 2.466], fleg: [-0.545, -0.972, 0.259], nleg: [-0.608, -0.717, 0.248], rest: [3.7, 0.063, 2.562], wind: [2.766, 0.41, 2.556, 2.766, 0.41, 2.556, 2.874, 0.213, 2.252, 2.063, 0.236, 2.527, 2.063, 0.236, 2.527, 3.402, 1.154, 2.248, 3.402, 1.154, 2.248], hit: [-0.792, -0.548, 1.668, 0.251, -0.414, 0.105, 0.781, -0.385, 0.32, -0.352, -0.804, 1.915, 0.538, -0.54, 0.3, -0.506, -0.408, 0.451, -0.042, -0.285, 0.105], neck: -0.5 },
   // GLOOPMAW
-  { yaw: 0.1, ox: 0.45, oz: -0.45, lunge: 1, lean: 0.35, far: [1.663, -0.127, 1.237], fleg: [0.9, 0.6, 0], nleg: [0.9, 0.6, 0], rest: [-0.738, 1.001, 2.422], wind: [2.207, -0.389, 2.27, 2.207, -0.389, 2.27, 2.606, -0.372, 2.013, 2.253, -0.247, 1.744, 2.253, -0.247, 1.744, 2.552, -0.83, 2.586, 2.552, -0.83, 2.586], hit: [0.358, -0.725, 1.753, 1.219, -0.529, 0, 1.219, -0.529, 0, 1.298, 0.538, 1.257, 1.681, 1.29, 0, -0.09, -0.249, 1.503, 0.909, -0.218, 0], neck: -0.6 },
+  { yaw: 0.1, ox: 0.45, oz: -0.45, lunge: 0.3, lean: 0.35, tilt: [0.35, 0.35], far: [1.663, -0.127, 1.237], fleg: [0.9, 0.6, 0], nleg: [0.9, 0.6, 0], rest: [-0.738, 1.001, 2.422], wind: [2.207, -0.389, 2.27, 2.207, -0.389, 2.27, 2.606, -0.372, 2.013, 2.253, -0.247, 1.744, 2.253, -0.247, 1.744, 2.552, -0.83, 2.586, 2.552, -0.83, 2.586], hit: [0.358, -0.725, 1.753, 1.219, -0.529, 0, 1.554, -0.529, 0.205, 1.298, 0.538, 1.257, 1.681, 1.29, 0, -0.09, -0.249, 1.503, 0.909, -0.218, 0], neck: -0.6 },
   // VOLTWING
-  { yaw: 0.1, ox: -0.1, oz: -0.85, lunge: 0.7, lean: 0.1, far: [0.78, -0.285, 2.4], fleg: [0.623, -1.294, 0.077], nleg: [0.742, -2.204, 0.406], rest: [-0.769, -0.232, 1.86], wind: [2.177, 1.8, 2.7, 2.177, 1.8, 2.7, 3.664, -1.301, 2.642, 2.015, 0.842, 2.7, 2.015, 0.842, 2.7, 3.7, -0.593, 2.7, 3.7, -0.593, 2.7], hit: [-0.098, -0.943, 1.614, 0.986, -0.947, 0.108, 1.098, -0.964, 0.108, 1.298, 1.466, 1.758, 2.054, 1.523, 0.108, 0.123, -0.571, 0.868, 0.825, -0.552, 0.108], neck: -1.1 },
+  { yaw: 0.1, ox: -0.1, oz: -0.85, lunge: 0.2, lean: 0.1, tilt: [0.35, 0.35], far: [0.78, -0.285, 2.4], fleg: [0.623, -1.294, 0.077], nleg: [0.742, -2.204, 0.406], rest: [-0.769, -0.232, 1.86], wind: [2.177, 1.8, 2.7, 2.177, 1.8, 2.7, 3.664, -1.301, 2.642, 2.015, 0.842, 2.7, 2.015, 0.842, 2.7, 3.7, -0.593, 2.7, 3.7, -0.593, 2.7], hit: [-0.098, -0.943, 1.614, 0.986, -0.947, 0.108, 0.998, -2.279, 0.408, 1.298, 1.466, 1.758, 2.054, 1.523, 0.108, 0.123, -0.571, 0.868, 0.825, -0.552, 0.108], neck: -1.1 },
 ];
 
 type Shape = "box" | "wedge" | "cyl" | "prism";
@@ -343,7 +343,8 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     const moving = Math.abs(M[3]!) > 0.3 || (wall && Math.abs(M[33]!) > 0.3), a = ph * 2.4, cyc = Math.sin(a), br = Math.sin(t * 1.9);
     // The shimmy: reach (cyc), then the hips push in (hump), then the body pulls up (lift), then the legs.
     const hump = wall ? (moving ? 0.5 + 0.5 * Math.sin(a - 1.3) : 0.3 + br * 0.08) : 0, lift = moving ? 0.5 + 0.5 * Math.sin(a - 2.3) : 0, step = moving ? Math.sin(a - 3.1) : 0;
-    // The far swing leans the body in (with the arm: in on the wind-up, back on the recovery).
+    // The far swing leans the body in, the head and shoulders forward into the reach (W.tilt: forward, round
+    // towards the front; in on the wind-up, back on the recovery).
     const lk = wall && punching && M[38]! === 3 ? (M[34]! > 0 ? Math.min(1, pt / PUNCH_HIT) * 0.4 : 1 - (Math.max(0, (pt - PUNCH_HIT) / (PUNCH_CD - PUNCH_HIT) - 0.3) / 0.7) ** 2) : 0;
     root.pos[0] = M[0]! + (wall ? f * (W.ox + W.lunge * lk) : 0);
     root.pos[1] = M[1]! + (wall ? (moving ? lift * 0.16 : br * 0.03) * MK : 0);
@@ -356,8 +357,9 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     const bob = walking && moving ? Math.abs(Math.cos(ph * 3.2)) * 0.1 : 0;
     body.pos[0] = hump * 0.14 * MK;
     body.pos[1] = (hipY + bob - squash * 0.25) * MK;
-    if (tor) tor.rot[2] = wall ? W.lean - hump * 0.12 : lean0;
-    else body.rot[2] = wall ? W.lean + hump * 0.08 : 0;
+    if (tor) tor.rot[2] = wall ? W.lean - hump * 0.12 - lk * W.tilt[0]! : lean0;
+    else body.rot[2] = wall ? W.lean + hump * 0.08 - lk * W.tilt[0]! : 0;
+    (tor ?? body).rot[0] = f * lk * W.tilt[1]!;
     // Which side is the far one (away from the camera): its arm and leg climb, the near arm smashes.
     const far = wall ? (f > 0 ? 0 : 1) : -1, out = wall ? 1 - far : f > 0 ? 1 : 0;
     // Legs. On a wall both feet plant on the side wall (the far one behind the body); they push in turn.
