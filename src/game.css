@@ -137,3 +137,10 @@
 .cs .cs-screen{padding:10px 12px 16px;gap:12px}
 .cs .cs-cities{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+.cs .cs-prac{margin:4px 0 0;padding:6px 10px;max-width:22em;border-radius:8px;background:#0d0b1ccc;color:#f4efff;font-size:.8em;line-height:1.35}
+.cs .cs-prac ol{margin:4px 0;padding-left:1.4em}
+.cs .cs-prac li.cs-done{color:#39ffb0;text-decoration:line-through}
+.cs .cs-prac li.cs-done::marker{content:"✓ "}
+.cs .cs-dots{display:flex;gap:5px;margin:2px 0 0}
+.cs .cs-dots i{width:10px;height:10px;border-radius:50%;border:1.5px solid #22e6ff}
+.cs .cs-dots i.cs-done{background:#22e6ff}

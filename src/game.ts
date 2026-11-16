@@ -134,7 +134,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
       return `<li><button type="button" class="bui-key cs-cityk${i === start ? " cs-on" : ""}" data-start="${i}" aria-pressed="${i === start}"${open ? "" : " disabled"}><small>${i + 1} · ${TOD[c.tod]}</small><b>${esc(c.name)}</b><span>${open ? esc(c.featureName) : "LOCKED"}${done ? " · ★" : ""}</span></button></li>`;
     }).join("");
     const who = [0, 1, 2, 3].map((s) => `<li class="${s < players ? "cs-in" : ""}" style="--seat:${SEAT_C[s]}"><i>P${s + 1}</i><b>${s === 0 ? esc(heroName(profile.look.fur, profile.look.face)) : RIVALS[s - 1]}</b><small>${s === 0 ? "WASD · SPACE · K · L" : s === 1 ? "ARROWS · , . /" : "GAMEPAD " + (s + 1)}</small></li>`).join("");
-    return `<section class="cs-screen cs-menu" aria-label="CitySmash">${head()}<div class="cs-mbody"><div class="cs-story"><h2>Climb it. Smash it. Eat the snacks.</h2><p>You are a giant cyber ape. Jump at a building's side and hang on: your inside arm grips, your outside arm smashes the windows by your climb. Three hits a window. Enough holes and the whole thing pancakes. Seven cities, day into night.</p><div class="cs-actions"><button type="button" class="bui-key bui-go cs-big" data-play>▶ SMASH ${esc(CITIES[start]!.name)}</button><button type="button" class="bui-key" data-go="garage">GARAGE</button><button type="button" class="bui-key" data-go="online">ONLINE</button></div><p class="cs-sub">PLAYERS ON THIS SCREEN</p><p class="cs-sizes" role="group" aria-label="Players on this screen">${[1, 2, 3, 4].map((n) => `<button type="button" class="bui-key" data-players="${n}" aria-pressed="${n === players}">${n}P</button>`).join("")}<button type="button" class="bui-key cs-riv" data-rivals aria-pressed="${!!profile.rivals}">RIVALS ${profile.rivals ? "ON" : "OFF"}</button></p><ol class="cs-who">${who}</ol>${note ? `<p class="cs-note">${esc(note)}</p>` : ""}</div><ol class="cs-cities" aria-label="Start from">${cities}</ol></div></section>`;
+    return `<section class="cs-screen cs-menu" aria-label="CitySmash">${head()}<div class="cs-mbody"><div class="cs-story"><h2>Climb it. Smash it. Eat the snacks.</h2><p>You are a giant cyber ape. Jump at a building's side and hang on: your inside arm grips, your outside arm smashes the windows by your climb. Three hits a window. Enough holes and the whole thing pancakes. Seven cities, day into night.</p><div class="cs-actions"><button type="button" class="bui-key bui-go cs-big" data-play>▶ SMASH ${esc(CITIES[start]!.name)}</button><button type="button" class="bui-key" data-practice>PRACTICE</button><button type="button" class="bui-key" data-go="garage">GARAGE</button><button type="button" class="bui-key" data-go="online">ONLINE</button></div><p class="cs-sub">PLAYERS ON THIS SCREEN</p><p class="cs-sizes" role="group" aria-label="Players on this screen">${[1, 2, 3, 4].map((n) => `<button type="button" class="bui-key" data-players="${n}" aria-pressed="${n === players}">${n}P</button>`).join("")}<button type="button" class="bui-key cs-riv" data-rivals aria-pressed="${!!profile.rivals}">RIVALS ${profile.rivals ? "ON" : "OFF"}</button></p><ol class="cs-who">${who}</ol>${note ? `<p class="cs-note">${esc(note)}</p>` : ""}</div><ol class="cs-cities" aria-label="Start from">${cities}</ol></div></section>`;
   }
   function garageCard() {
     const lk = profile.look;
@@ -179,7 +179,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
   }
 
   // ---- the run ----
-  function playRun(from: number, n = players) {
+  function playRun(from: number, n = players, practice = false) {
     netEnd();
     scene?.destroy();
     sceneEl.textContent = "";
@@ -189,7 +189,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     const drivers = [0, AI, AI, AI];
     for (let s = 1; s < n && s < NM; s++) drivers[s] = s;
     scene = mountScene(sceneEl, {
-      look: profile.look, seed: (o.seed ?? 1) * 7919 + profile.stats.runs * 31 + 20261116, first: from, rivals: profile.rivals, drivers, theme: pageTheme, sound: o.sound, attract: o.attract,
+      look: profile.look, seed: (o.seed ?? 1) * 7919 + profile.stats.runs * 31 + 20261116, first: from, rivals: profile.rivals, drivers, theme: pageTheme, sound: o.sound, attract: o.attract, practice,
       unlocks: (ci) => {
         const t = cityUnlocks[ci];
         return t && t.length ? `UNLOCKED: ${t.map(partName).join(" · ")}` : "";
@@ -197,12 +197,14 @@ export function createCitySmash(o: CitySmashOptions = {}) {
       on: onScene,
     });
     if (o.attract) scene.auto = true;
-    say(o.attract ? "" : `${CITIES[from]!.name}: walk or punch to start`);
+    say(o.attract ? "" : practice ? "Practice: nothing hurts here. Tick off the steps; the menu key leaves." : `${CITIES[from]!.name}: walk or punch to start`);
     return scene;
   }
   const cityUnlocks: string[][] = [];
   function onScene(what: "clear" | "end" | "menu" | "join", v: number) {
     if (o.attract) return;
+    // Practice never touches the score, the progress or the unlocks.
+    if (scene?.practice && what !== "menu") return;
     if (what === "clear") {
       const r = clearCity(profile, v);
       profile = r.profile;
@@ -385,6 +387,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     if (!b) return;
     const d = b.dataset;
     if ("play" in d) return void playRun(start);
+    if ("practice" in d) return void playRun(0, 1, true);
     if (d.go) return (note = ""), show(d.go as Screen);
     if (d.start) return (start = +d.start), paint();
     if (d.players) return (players = +d.players), (note = players > 2 ? "Players three and four play on gamepads (a press joins)." : ""), paint();
@@ -440,6 +443,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
 
   engine.start();
   if (o.attract) playRun(0, 1);
+  else if (qs.get("mode") === "practice") playRun(0, 1, true);
   else {
     paint();
     // A link with a room and a code drops the player straight into that room.
@@ -465,6 +469,8 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     },
     getSnapshot: () => ({ screen, start, players, best: profile.best, cleared: profile.cleared.slice(), look: { ...profile.look }, scene: scene ? scene.state : null, online: net.link ? { seat: net.seat, players: net.players, frame: net.link.frame, final: net.link.final, desync: net.link.desync } : null }),
     play: (from = start, n = players) => playRun(from, n),
+    /** Practice: the controls without the danger. */
+    practice: () => playRun(0, 1, true),
     show,
     /** Set a garage part (as a click would). */
     setPart: (k: Part, i: number) => ((profile = setPart(profile, k, i)), keep(), screen === "garage" && paint(), profile.look),

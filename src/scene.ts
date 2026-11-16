@@ -21,13 +21,15 @@ import {
   createRun, NM, NS, NP, NCH, NH, NT, SEATS, AI, HERO, CRAB, IN, READY, RUN, CLEAR, DONE, CLIMB, ROOF, KO,
   E_START, E_HOLE, E_SHAKE, E_FLOOR, E_FLAT, E_HELI, E_HELI_CRASH, E_NOM, E_HURT, E_FLING, E_DROP, E_KO, E_END, E_STOMP, E_JUMP, E_LAND, E_CLIMB,
   E_SHOCK, E_TANK, E_BONK, E_BURN, E_JOIN, E_CHIP_, E_CRACK_, E_ARMOUR, E_TRAIN, E_BELLS, E_RAM, E_TRUCK, E_SURGE, E_CITY, E_CLEAR, E_PUNCH,
-  NI, NR, NG, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS,
+  NI, NR, NG, P_ALL, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS,
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
 import { buildMonster, monName, shade, RIVALS, WALL, TRIMS, type Look, type Monster, type RigInk } from "./monster.ts";
 
 const TAU = 6.283185307179586;
+/** Practice's steps, in ./round.ts P_* order. */
+const PRACTICE = ["Walk", "Jump onto a building's side", "Climb it", "Punch all 7 reach cells", "Grab someone at a window", "Swat the parked helicopter", "Punch past a live (sparking) window"];
 const mix = (a: string, b: string, k: number) => {
   const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), f = (s: number) => Math.round(((x >> s) & 255) * (1 - k) + ((y >> s) & 255) * k).toString(16).padStart(2, "0");
   return "#" + f(16) + f(8) + f(0);
@@ -94,6 +96,8 @@ export interface SceneOptions {
   sound?: boolean;
   /** The landing page's hero: the ape on the autopilot, no stickers, the cities loop. */
   attract?: boolean;
+  /** Practice: the controls without the danger (./round.ts S[28]), its steps ticked off on a card. */
+  practice?: boolean;
   /** Online: this screen's seat (the camera follows its monster); ./game.ts steps the run. */
   net?: { seat: number } | null;
   /** The shell's hooks: a city cleared, the run's end, the menu key. */
@@ -111,7 +115,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   const run: Run = createRun(so.seed ?? 20261116), S = run.S, MV = run.MV;
   const drivers = so.drivers ?? [0, AI, AI, AI];
   for (let k = 0; k < NM; k++) run.MV[k]![28] = k === HERO ? 0 : drivers[k] ?? AI;
-  run.reset(so.seed ?? 20261116, so.first ?? 0, so.rivals ?? 1);
+  run.reset(so.seed ?? 20261116, so.first ?? 0, so.rivals ?? 1, so.practice ? 1 : 0);
   if (so.attract) S[27] = 1;
   let built = -1, P: Pal = palette(CITIES[S[16]!]!, light());
   const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1;
@@ -128,12 +132,12 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   const hud = L.add(document.createElement("div"));
   hud.className = "cs-hud";
   hud.hidden = !!so.attract;
-  hud.innerHTML = `<div class="cs-head"><p class="cs-top"><b class="cs-chip cs-city"><span></span><em></em></b><b class="cs-chip cs-team"><em>SCORE</em><span>0</span></b><b class="cs-chip cs-flat"><span>0%</span><em>FLAT</em></b></p><p class="cs-mons">${[0, 1, 2, 3].map((k) => `<b class="cs-chip cs-mon cs-m${k}" hidden><i></i><em></em><u><s></s></u><span>0</span></b>`).join("")}</p><p class="cs-hint"></p></div>`
+  hud.innerHTML = `<div class="cs-head"><p class="cs-top"><b class="cs-chip cs-city"><span></span><em></em></b><b class="cs-chip cs-team"><em>SCORE</em><span>0</span></b><b class="cs-chip cs-flat"><span>0%</span><em>FLAT</em></b></p><p class="cs-mons">${[0, 1, 2, 3].map((k) => `<b class="cs-chip cs-mon cs-m${k}" hidden><i></i><em></em><u><s></s></u><span>0</span></b>`).join("")}</p><p class="cs-hint"></p><div class="cs-prac" hidden><b>PRACTICE</b> <small>nothing hurts · ☰ to leave</small><ol>${PRACTICE.map((t) => `<li>${t}</li>`).join("")}</ol><p class="cs-dots" aria-label="Reach cells punched">${"<i></i>".repeat(NR)}</p></div></div>`
     + `<p class="cs-toast" hidden></p><p class="cs-live" aria-live="polite"></p><p class="cs-keys"><button type="button" class="cs-key cs-menu" aria-label="Menu (Escape)">☰</button><button type="button" class="cs-key cs-mute" aria-label="Mute (M)" aria-pressed="true">♪</button></p>`
     + `<div class="cs-card cs-ccard" role="dialog" aria-label="City flattened" hidden><small></small><b></b><p class="cs-t"></p><p class="cs-next"></p><p class="cs-unl"></p><p class="cs-go-say"></p></div>`
     + `<div class="cs-card cs-end" role="dialog" aria-label="Run over" hidden><b></b><p class="cs-t"></p><ol class="cs-board"></ol><p class="cs-stats"></p><p class="cs-row"><button type="button" class="bui-key cs-again">PLAY AGAIN</button><button type="button" class="bui-key cs-retry"></button><button type="button" class="bui-key cs-tomenu">MENU</button></p></div>`;
   const q = <T extends HTMLElement>(s: string) => hud.querySelector(s) as T;
-  const cityEl = q(".cs-city span"), todEl = q(".cs-city em"), teamEl = q(".cs-team span"), flatEl = q(".cs-flat span"), hintEl = q(".cs-hint"), toastEl = q(".cs-toast"), live = q(".cs-live");
+  const cityEl = q(".cs-city span"), todEl = q(".cs-city em"), teamEl = q(".cs-team span"), flatEl = q(".cs-flat span"), hintEl = q(".cs-hint"), pracEl = q(".cs-prac"), toastEl = q(".cs-toast"), live = q(".cs-live");
   const monChips = [0, 1, 2, 3].map((k) => q(".cs-m" + k));
   const ccard = q(".cs-ccard"), endC = q(".cs-end"), board = q(".cs-board");
   const muteK = q<HTMLButtonElement>(".cs-mute"), menuK = q<HTMLButtonElement>(".cs-menu"), again = q<HTMLButtonElement>(".cs-again"), retry = q<HTMLButtonElement>(".cs-retry"), toMenu = q<HTMLButtonElement>(".cs-tomenu");
@@ -905,6 +909,16 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       chip.classList.toggle("cs-low", O[7]! <= 30);
       (chip.lastChild as HTMLElement).textContent = num(O[25]!);
     }
+    const pk = S[28] ? S[29]! * 128 + S[30]! : -1;
+    if (was[8] !== pk) {
+      was[8] = pk;
+      pracEl.hidden = pk < 0;
+      if (pk >= 0) {
+        pracEl.querySelectorAll("li").forEach((li, i) => li.classList.toggle("cs-done", (S[29]! & (1 << i)) > 0));
+        pracEl.querySelectorAll("i").forEach((d, i) => d.classList.toggle("cs-done", (S[30]! & (1 << i)) > 0));
+        if (S[29] === P_ALL) say("Practice done: every step ticked off");
+      }
+    }
     const ph = S[0]!;
     if (was[3] !== ph) {
       was[3] = ph;
@@ -945,7 +959,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   }
   /** A new run from city `first` (the drivers stay). */
   function restart(first = 0) {
-    run.reset(so.seed ?? 20261116, first, S[22]!);
+    run.reset(so.seed ?? 20261116, first, S[22]!, S[28]!);
     if (so.attract) S[27] = 1;
     endC.hidden = ccard.hidden = true;
     cardUp = -1;
@@ -1800,6 +1814,10 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     look,
     get auto() {
       return auto;
+    },
+    /** A practice run (./round.ts S[28]). */
+    get practice() {
+      return S[28] === 1;
     },
     set auto(on: boolean) {
       auto = on;

@@ -53,6 +53,10 @@ export const GRAB_HELI = [1, 0, -1, 0, 0, 1, 0, -1, 1, 1, 1, -1, -1, 1, -1, -1],
  *  (T_STREET + 0 or 1, at whatever is in front); a swing at nothing in reach (T_MISS: a whiff, no effect). */
 export const T_CELL = 1, T_GRAB = 8, T_HELI = 20, T_CHUTE = 22, T_SOLDIER = 42, T_END = 51, T_STREET = 51, T_MISS = 53;
 
+/** Practice (S[28]): one player, no army (a parked helicopter that never fires), no health lost, flattened
+ *  buildings come back; its steps (bits in S[29]): walk, onto a wall, climb, punch all seven reach cells
+ *  (S[30], a bit a cell), eat someone, swat the helicopter, a punch past a live window. */
+export const P_WALK = 1, P_WALL = 2, P_CLIMB = 4, P_REACH = 8, P_NOM = 16, P_HELI = 32, P_LIVE = 64, P_ALL = 127;
 /** A run. `step(dt, IN)`: IN holds NI numbers per seat (mx, my −1..1 with my up, punch, jump, grab: 1 on the press, a target). */
 export function createRun(seed = 20261116) {
   // The one random: an LCG in the state (so the rollback saves it with the rest).
@@ -61,7 +65,8 @@ export function createRun(seed = 20261116) {
   /** [0] phase, [1] city time, [2] team score, [3] holes, [4] buildings flat, [5] helicopters down, [6] snacks, [7] soldiers flung,
    *  [8] floors down, [9] end delay, [10] best, [11] tanks, [12] shocks, [13] last hole, [14] last punch direction, [15] last nom's monster,
    *  [16] city, [17] card timer, [18] cities cleared this run, [19] run time, [20] won, [21] first city, [22] rivals on, [23] trains,
-   *  [24] trucks, [25] surges, [26] city start score, [27] attract (no end: the next city loops). */
+   *  [24] trucks, [25] surges, [26] city start score, [27] attract (no end: the next city loops), [28] practice (./PRACTICE),
+   *  [29] practice steps done (bits, ./P_*), [30] reach cells punched in practice (bits), [31] practice: a flat building's rebuild timer. */
   const S = new Float64Array(32);
   /** Per monster (MW numbers each): [0] x, [1] y, [2] z, [3] vx, [4] vy, [5] mode, [6] face, [7] hp, [8] punch cooldown, [9] punch anim,
    *  [10] grab anim, [11] hurt, [12] on building, [13] walk phase, [14] grab cooldown, [15] invulnerable, [16] fist x, [17] fist y,
@@ -101,6 +106,7 @@ export function createRun(seed = 20261116) {
   const ev = new Float64Array(96), IA = new Float64Array(NI), SAVE = new Float64Array(10), TG = new Float64Array(2), GC = new Float64Array(2);
 
   function emit(t: number, v: number) {
+    if (S[28] && cur === 0) S[29] = S[29]! | (t === E_NOM ? P_NOM : t === E_HELI ? P_HELI : 0);
     if (run.n < 32) (ev[run.n * 3] = t), (ev[run.n * 3 + 1] = v), (ev[run.n * 3 + 2] = cur), run.n++;
     if (t === E_CHIP) pts(1);
     else if (t === E_CRACK) pts(2);
@@ -187,11 +193,12 @@ export function createRun(seed = 20261116) {
   }
 
   /** A new run from city `first`; `rivals` 1: the AI rivals come in (0: none); the drivers stay. */
-  function reset(s = seed, first = 0, rivals = 1) {
+  function reset(s = seed, first = 0, rivals = 1, practice = 0) {
     R[0] = s >>> 0;
     S.fill(0);
     S[21] = first;
-    S[22] = rivals;
+    S[22] = practice ? 0 : rivals;
+    S[28] = practice;
     const drivers = [MV[0]![28]!, MV[1]![28]!, MV[2]![28]!, MV[3]![28]!];
     MS.fill(0);
     for (let k = 0; k < NM; k++) (MV[k]![28] = k === HERO ? (drivers[k] === AI ? 0 : drivers[k]!) : drivers[k] || AI), (MV[k]![7] = MAX_HP), (MV[k]![24] = IN), (MV[k]![31] = k);
@@ -276,7 +283,7 @@ export function createRun(seed = 20261116) {
     emit(E_SHOT, kind);
   }
   function hurt(n: number) {
-    if (M[15]! > 0 || M[5] === KO || S[0] !== RUN) return;
+    if (M[15]! > 0 || M[5] === KO || S[0] !== RUN || S[28]) return;
     M[7] = Math.max(0, M[7]! - n);
     M[11] = 0.3;
     M[15] = 0.12;
@@ -306,7 +313,7 @@ export function createRun(seed = 20261116) {
   /** A live part bites: a zap, a little health, it lets go and drops away from the wall. */
   function shock(at: number) {
     M[23] = 0.9;
-    M[7] = Math.max(0, M[7]! - SHOCK_HP);
+    if (!S[28]) M[7] = Math.max(0, M[7]! - SHOCK_HP);
     M[11] = 0.3;
     M[15] = 0.5;
     S[12]!++;
@@ -484,6 +491,11 @@ export function createRun(seed = 20261116) {
     if (md === CLIMB) {
       // The reach cell picked at the wind-up; a hole there is a whiff (the fist goes in, nothing to break).
       const i = reachCell(M, M[38]! - 1);
+      if (S[28] && i >= 0 && cur === 0) {
+        S[30] = S[30]! | (1 << (M[38]! - 1));
+        if (S[30] === 127) S[29] = S[29]! | P_REACH;
+        if (!LIVE[i]) for (let c = 0; c < NR; c++) if (LIVE[reachCell(M, c)]! && reachCell(M, c) >= 0) S[29] = S[29]! | P_LIVE;
+      }
       if (i >= 0 && cell[i] !== HOLE) return void (LIVE[i] ? shock(i) : bk.strike(i, cur));
       return void emit(E_WHIFF, 0);
     }
@@ -937,6 +949,7 @@ export function createRun(seed = 20261116) {
     }
     setCur(0);
     bk.step(dt);
+    if (S[28]) return stepPractice(dt);
     stepArmy(dt);
     setCur(0);
     if (S[9]! > 0) {
@@ -953,6 +966,32 @@ export function createRun(seed = 20261116) {
         } else end(0);
       }
     } else if (S[4] === nb() || humans() === 0) S[9] = S[4] === nb() ? 1.6 : 1.4;
+    return true;
+  }
+  /** Practice, after the monsters: the steps the player has done, the parked helicopter (back a moment after a
+   *  swat), and a flattened building rebuilt (the whole block, the monster dropped off it). */
+  function stepPractice(dt: number) {
+    const O = MV[0]!, md = O[5]!;
+    O[7] = MAX_HP;
+    S[29] = S[29]! | (md === WALK && Math.abs(O[3]!) > 0.5 ? P_WALK : 0) | (md === CLIMB ? P_WALL : 0) | (md === CLIMB && Math.abs(O[33]!) > 0.3 ? P_CLIMB : 0);
+    const h = HE;
+    if (h[0] !== 1) {
+      h[8] = (h[0] === 2 ? h[8]! : 0) + dt;
+      if (h[0] === 2) (h[5] = h[5]! - G * 0.5 * dt), (h[1] = h[1]! + h[4]! * dt), (h[2] = Math.max(0, h[2]! + h[5]! * dt)), (h[9] = h[9]! + dt * 8);
+      if (h[0] !== 2 || h[8]! > 2.2) {
+        // Parked beside the second building's top floor, nose to it, still.
+        const b = Math.min(1, nb() - 1);
+        h.fill(0, 0, 12);
+        h[0] = 1; h[1] = BLD[b * 4]! + BLD[b * 4 + 1]! + 1.6; h[2] = top(b) - 1.2; h[3] = 0.4; h[6] = 1e9;
+        h[0] = 1;
+      }
+    }
+    for (let b = 0; b < nb(); b++) if (B[b * 6] === RUBBLE) S[31] = S[31]! + dt;
+    if (S[31]! > 1.5) {
+      S[31] = 0;
+      for (let k = 0; k < NM; k++) cl.dropOff(MV[k]!, MV[k]![12]!);
+      bk.reset(1);
+    }
     return true;
   }
   /** After the end: what is still falling settles (a last floor, the monster). */
