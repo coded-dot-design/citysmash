@@ -92,3 +92,23 @@ test("the garage: the ape's name from its fur and face; three rivals of our own 
   assert.equal(new Set(words).size, words.length, "every name its own");
   for (const w of Mo.RIVAL_WHAT) assert.doesNotMatch(w, /lizard|wolf/i);
 });
+
+test("the hair: a v1 save and a v1 code (before the hair) still load, with none; the hair round-trips the save and the code", () => {
+  const v1 = { v: 1, look: { fur: 1, trim: 0, pattern: 1, face: 0, gear: 3 }, owned: ["fur:1"], cleared: [], best: 7, rivals: 1, stats: { runs: 1, buildings: 0, snacks: 0, helis: 0 } };
+  const s = mem();
+  s.set(P.KEY, JSON.stringify(v1));
+  const got = P.load(s).profile;
+  assert.equal(got.v, P.VERSION);
+  assert.deepEqual([got.look.fur, got.look.hair, got.look.hairc, got.best], [1, 0, Mo.LOOK0.hairc, 7]);
+  // A CS1- code made by the v1 game (the same format: base64 of the JSON, a checksum).
+  const sum = (t) => { let h = 7; for (let i = 0; i < t.length; i++) h = (Math.imul(h, 31) + t.charCodeAt(i)) >>> 0; return (h % 46656).toString(36).padStart(3, "0"); };
+  const body = Buffer.from(JSON.stringify(v1)).toString("base64"), old = P.importCode(`CS1-${body}-${sum(body)}`);
+  assert.ok(old && old.look.hair === 0 && old.look.fur === 1, "an old code imports");
+  let p = P.setPart(P.setPart(P.fresh(), "hair", 3), "hairc", 5);
+  assert.deepEqual([p.look.hair, p.look.hairc], [3, 5], "every hair and colour is yours from the start");
+  assert.deepEqual(P.importCode(P.exportCode(p)).look, p.look, "the code carries the hair");
+  P.save(p, s);
+  assert.deepEqual(P.load(s).profile.look, p.look, "the save carries the hair");
+  assert.equal(P.normalize({ ...p, look: { ...p.look, hair: 9, hairc: -1 } }).look.hair, 0, "out of range: none");
+  assert.deepEqual(Mo.HAIRS.map((h) => h.id), ["none", "mohawk", "spikes", "crest"]);
+});

@@ -15,7 +15,7 @@ import type { Look } from "./monster.ts";
  *  left (11), the tapped target (12–18: ./round.ts T_*), six bits of the ape's look (24–29, the first
  *  frames only, from seat 0). */
 export const B_PUNCH = 1 << 8, B_JUMP = 1 << 9, B_GRAB = 1 << 10, B_GONE = 1 << 11;
-export const SEATS = 4, NAME = 8, LOOK_FRAMES = 4, NI = 6;
+export const SEATS = 4, NAME = 8, LOOK_FRAMES = 5, NI = 6;
 const q4 = (v: number) => Math.max(1, Math.min(15, Math.round(v * 7) + 8));
 
 /** Pack one seat's numbers (mx, my, punch, jump, grab, target) into 32 bits. */
@@ -39,14 +39,14 @@ export const GONE = B_GONE >>> 0;
 export const packMode = (first: number, rivals: number) => (first & 7) | (rivals ? 8 : 0);
 export const unpackMode = (m: number) => ({ first: m & 7, rivals: m & 8 ? 1 : 0 });
 
-/** The ape's look in 24 bits (fur 4, trim 3, pattern 3, face 3, gear 8), six a frame over LOOK_FRAMES frames. */
+/** The ape's look in 26 bits (fur 4, trim 3, pattern 3, face 3, gear 8, hair 2, its colour 3), six a frame over LOOK_FRAMES frames. */
 export const lookBits = (l: Look, f: number) => {
-  const all = (l.fur & 15) | ((l.trim & 7) << 4) | ((l.pattern & 7) << 7) | ((l.face & 7) << 10) | ((l.gear & 255) << 13);
+  const all = (l.fur & 15) | ((l.trim & 7) << 4) | ((l.pattern & 7) << 7) | ((l.face & 7) << 10) | ((l.gear & 255) << 13) | ((l.hair & 3) << 21) | ((l.hairc & 7) << 23);
   return f < LOOK_FRAMES ? ((all >>> (f * 6)) & 63) << 24 : 0;
 };
 /** Fold frame f's look bits into `acc` (start at 0); after LOOK_FRAMES frames, `lookOf(acc)`. */
 export const takeLook = (acc: number, bits: number, f: number) => (f < LOOK_FRAMES ? acc | (((bits >>> 24) & 63) << (f * 6)) : acc);
-export const lookOf = (a: number): Look => ({ fur: a & 15, trim: (a >> 4) & 7, pattern: (a >> 7) & 7, face: (a >> 10) & 7, gear: (a >> 13) & 255 });
+export const lookOf = (a: number): Look => ({ fur: a & 15, trim: (a >> 4) & 7, pattern: (a >> 7) & 7, face: (a >> 10) & 7, gear: (a >> 13) & 255, hair: (a >> 21) & 3, hairc: (a >> 23) & 7 });
 
 /** A hash of the run's state (its byte views), for the desync check. */
 export function hashOf(bytes: Uint8Array[]) {

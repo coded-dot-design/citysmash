@@ -48,7 +48,8 @@ try {
   await until(B, () => game.getSnapshot().online, null, "B starts");
   assert.deepEqual([await A.evaluate(() => game.getSnapshot().online.seat), await B.evaluate(() => game.getSnapshot().online.seat)], [0, 1], "A is the ape, B is SHARDCLAW");
   assert.equal(await B.evaluate(() => game.scene.run.MV[1][28]), 1, "SHARDCLAW is B's");
-  await until(B, (l) => JSON.stringify(game.scene.look) === JSON.stringify(l), look, "the ape's look reaches B");
+  // (A's save is a version 1 one: it migrates with no hair, the pink to pick, and that travels too.)
+  await until(B, (l) => JSON.stringify(game.scene.look) === JSON.stringify(l), { ...look, hair: 0, hairc: 1 }, "the ape's look reaches B");
   console.log("✓ B joins by the link; the ape's look reached B");
   // Both play on the autopilot of their own seat.
   await A.evaluate(() => (game.scene.auto = true));

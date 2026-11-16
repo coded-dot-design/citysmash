@@ -12,7 +12,7 @@ import { lockTouch } from "@fzlt/core/touch";
 import type { Transport } from "@fzlt/core/presence";
 import { mountScene, SEAT_C, type Scene } from "./scene.ts";
 import { CITIES, NCITY } from "./cities.ts";
-import { buildMonster, heroName, shade, FURS, TRIMS, PATTERNS, FACES, GEAR, RIVALS, RIVAL_WHAT, type Look, type RigInk } from "./monster.ts";
+import { buildMonster, heroName, shade, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS, RIVAL_WHAT, type Look, type RigInk } from "./monster.ts";
 import { AI, NM, DONE } from "./round.ts";
 import { load, save, local, fresh, clearCity, startable, endRun, setPart, partName, unlockedBy, exportCode, importCode, type Profile, type Store, type Part } from "./profile.ts";
 import { encode, decode, NI, packMode, unpackMode, joinRoom, rollback, lookBits, takeLook, lookOf, GONE, B_GONE, SEATS, LOOK_FRAMES, type Rollback } from "./net.ts";
@@ -31,7 +31,7 @@ export interface CitySmashOptions {
 type Screen = "menu" | "garage" | "play" | "online";
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const num = (n: number) => n.toLocaleString("en-US");
-const TABS: [Part, string, number][] = [["fur", "FUR", FURS.length], ["trim", "TRIM", TRIMS.length], ["pattern", "PATTERN", PATTERNS.length], ["face", "FACE", FACES.length], ["gear", "GEAR", GEAR.length]];
+const TABS: [Part, string, number][] = [["fur", "FUR", FURS.length], ["trim", "TRIM", TRIMS.length], ["pattern", "PATTERN", PATTERNS.length], ["face", "FACE", FACES.length], ["hair", "HAIR", HAIRS.length], ["gear", "GEAR", GEAR.length]];
 const TOD = ["DAY", "DUSK", "NIGHT"];
 const ROOM_N = 16;
 
@@ -142,13 +142,14 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     if (tab === "code") side = `<div class="cs-code"><label for="cs-code">Your save code: copy it to move this ape to another device.</label><textarea id="cs-code" rows="4" readonly>${exportCode(profile)}</textarea><label for="cs-in">Paste a code to load it:</label><textarea id="cs-in" rows="3"></textarea><button type="button" class="bui-key" data-import>LOAD CODE</button></div>`;
     else {
       const [k, , n] = TABS.find((t) => t[0] === tab)!;
-      const items = Array.from({ length: n }, (_, i) => {
+      const list = (k: Part, n: number) => `<ul class="cs-opts cs-${k}">${Array.from({ length: n }, (_, i) => {
         const own = owns(k, i), on = k === "gear" ? (lk.gear & (1 << i)) > 0 : lk[k] === i, by = unlockedBy(`${k}:${i}`);
-        const sw = k === "fur" ? FURS[i]!.c : k === "trim" ? TRIMS[i]!.c : "";
-        const name = k === "fur" ? FURS[i]!.name : k === "trim" ? TRIMS[i]!.name : k === "pattern" ? PATTERNS[i]!.name : k === "face" ? FACES[i]!.name : GEAR[i]!.name;
+        const sw = k === "fur" ? FURS[i]!.c : k === "trim" || k === "hairc" ? TRIMS[i]!.c : "";
+        const name = k === "fur" ? FURS[i]!.name : k === "trim" || k === "hairc" ? TRIMS[i]!.name : k === "pattern" ? PATTERNS[i]!.name : k === "face" ? FACES[i]!.name : k === "hair" ? HAIRS[i]!.name : GEAR[i]!.name;
         return `<li><button type="button" class="bui-key cs-opt${sw ? " cs-sw" : ""}" data-part="${k}" data-i="${i}" aria-pressed="${on}"${own ? "" : ` data-locked aria-label="${esc(name)}: flatten ${esc(CITIES[by]?.name ?? "")} to unlock"`}${sw ? ` style="--c:${sw}"` : ""}>${sw ? `<i></i><span>${esc(name.toUpperCase())}</span>` : esc(name.toUpperCase())}${own ? "" : `<small>🔒 ${esc(CITIES[by]?.name ?? "")}</small>`}</button></li>`;
-      }).join("");
-      side = `<ul class="cs-opts cs-${k}">${items}</ul>`;
+      }).join("")}</ul>`;
+      // The hair tab: the style, then one colour for it (the neon palette).
+      side = list(k, n) + (k === "hair" ? `<p class="cs-sub">HAIR COLOUR</p>${list("hairc", TRIMS.length)}` : "");
     }
     return `<section class="cs-screen cs-garage" aria-label="Garage">${head()}<div class="cs-gbody"><div class="cs-gview"><div class="cs-pvwrap"></div><b class="cs-mname">${esc(heroName(lk.fur, lk.face))}</b></div><div class="cs-gside"><p class="cs-gtabs" role="group" aria-label="Garage tabs">${TABS.map(([k, label]) => `<button type="button" class="bui-key" data-tab="${k}" aria-pressed="${tab === k}">${label}</button>`).join("")}<button type="button" class="bui-key" data-tab="code" aria-pressed="${tab === "code"}">SAVE CODE</button></p>${side}${note ? `<p class="cs-note">${esc(note)}</p>` : ""}<p class="cs-actions"><button type="button" class="bui-key" data-go="menu">◂ BACK</button><button type="button" class="bui-key" data-random>RANDOM</button><button type="button" class="bui-key bui-go" data-play>▶ SMASH</button></p></div></div></section>`;
   }
@@ -349,7 +350,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     paint();
     const drivers = [0, AI, AI, AI];
     for (let k = 1; k < net.players; k++) drivers[k] = k;
-    scene = mountScene(sceneEl, { look: net.seat === 0 ? profile.look : { fur: 0, trim: 0, pattern: 0, face: 0, gear: 0 }, seed: s.seed >>> 0, first: m.first, rivals: m.rivals, drivers, theme: pageTheme, sound: o.sound, net: { seat: net.seat }, on: onScene });
+    scene = mountScene(sceneEl, { look: net.seat === 0 ? profile.look : { fur: 0, trim: 0, pattern: 0, face: 0, gear: 0, hair: 0, hairc: 0 }, seed: s.seed >>> 0, first: m.first, rivals: m.rivals, drivers, theme: pageTheme, sound: o.sound, net: { seat: net.seat }, on: onScene });
     const sc = scene, me = net.seat;
     net.link = rollback(sc.engine, {
       transport: s.transport, slot: me, players: net.players, gone: GONE, bytes: sc.run.bytes,
@@ -410,7 +411,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
       const r = engine.random, pickOwned = (k: Part, n: number) => { const ok = Array.from({ length: n }, (_, i) => i).filter((i) => owns(k, i)); return ok[(r() * ok.length) | 0]!; };
       let gear = 0;
       for (let g = 0; g < GEAR.length; g++) if (owns("gear", g) && r() < 0.5) gear |= 1 << g;
-      profile = { ...profile, look: { fur: pickOwned("fur", FURS.length), trim: pickOwned("trim", TRIMS.length), pattern: pickOwned("pattern", PATTERNS.length), face: pickOwned("face", FACES.length), gear } };
+      profile = { ...profile, look: { fur: pickOwned("fur", FURS.length), trim: pickOwned("trim", TRIMS.length), pattern: pickOwned("pattern", PATTERNS.length), face: pickOwned("face", FACES.length), gear, hair: pickOwned("hair", HAIRS.length), hairc: pickOwned("hairc", TRIMS.length) } };
       keep();
       paint();
       return spin();

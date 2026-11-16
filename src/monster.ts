@@ -42,6 +42,8 @@ export const TRIMS = [
 ];
 export const PATTERNS = [{ id: "plain", name: "PLAIN" }, { id: "stripes", name: "STRIPES" }, { id: "patches", name: "PATCHES" }, { id: "spots", name: "SPOTS" }, { id: "circuit", name: "CIRCUIT" }];
 export const FACES = [{ id: "brow", name: "BROW", word: "BROWLER" }, { id: "crest", name: "CREST", word: "CRESTBACK" }, { id: "tusks", name: "TUSKS", word: "TUSKER" }, { id: "horns", name: "HORNS", word: "HORNHEAD" }, { id: "mane", name: "MANE", word: "SHAGGER" }];
+/** Hair (cyber-punk, in a neon of its own: TRIMS): none, a mohawk (a tall block fin), spikes, a swept crest. */
+export const HAIRS = [{ id: "none", name: "NONE" }, { id: "mohawk", name: "MOHAWK" }, { id: "spikes", name: "SPIKES" }, { id: "crest", name: "CREST" }];
 /** Gear, one bit each. */
 export const GEAR = [
   { id: "arm", name: "CYBER ARM" }, { id: "visor", name: "VISOR" }, { id: "plate", name: "CHEST PLATE" }, { id: "spikes", name: "TAIL SPIKES" },
@@ -55,8 +57,8 @@ export const heroName = (fur: number, face: number) => (FURS[fur] ?? FURS[0]!).w
 /** A monster's name. */
 export const monName = (k: number, look: Look) => (k === HERO ? heroName(look.fur, look.face) : RIVALS[k - 1]!);
 
-export interface Look { fur: number; trim: number; pattern: number; face: number; gear: number }
-export const LOOK0: Look = { fur: 0, trim: 0, pattern: 1, face: 0, gear: 3 };
+export interface Look { fur: number; trim: number; pattern: number; face: number; gear: number; hair: number; hairc: number }
+export const LOOK0: Look = { fur: 0, trim: 0, pattern: 1, face: 0, gear: 3, hair: 0, hairc: 1 };
 export interface RigInk { ink: string; eye: string; pupil: string; teeth: string; night: boolean; metal: string }
 
 /** A rig on a wall (for a monster facing +x, on a building's left side; the other side mirrors). It climbs
@@ -199,6 +201,13 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     if (g & 2) P("neck", "box", [0.1, 0.13, 0.9], [0.48, 0.42, 0], trim, { emissive: true }); // the visor
     if (g & 128) P("jaw", "box", [0.18, 0.24, 0.62], [0.34, -0.12, 0], K.metal), P("jaw", "box", [0.04, 0.05, 0.64], [0.44, -0.04, 0], trim, { emissive: true });
     for (const s of [-1, 1]) P("neck", "box", [0.16, 0.2, 0.08], [0, 0.45, s * 0.44], skin); // ears
+    // The hair, on the head's top (0.74), lit in its own neon.
+    const hc = (TRIMS[look.hairc] ?? TRIMS[1]!).c, hair = look.hair, H = { emissive: true };
+    if (hair === 1) for (let k = 0; k < 4; k++) P("neck", "box", [0.2, 0.64 - k * 0.11, 0.14], [0.24 - k * 0.19, 0.72, 0], hc, H); // the mohawk: a stepped fin
+    else if (hair === 2) for (let k = 0; k < 7; k++) {
+      const a = (k - 3) * 0.42; // spikes fanned across the top and back
+      P("neck", "cyl", [0.22, 0.64 - Math.abs(k - 3) * 0.06, 0.22], [0.08 - (k % 2) * 0.24, 0.7, Math.sin(a) * 0.3], hc, { ...H, sides: 4, top: 0, rot: [-a * 0.9, 0, 0.35 + (k % 2) * 0.3] });
+    } else if (hair === 3) for (let k = 0; k < 3; k++) P("neck", "wedge", [0.62 - k * 0.1, 0.3 - k * 0.05, 0.6 - k * 0.16], [-0.12 - k * 0.1, 0.72 + k * 0.08, 0], hc, { ...H, rot: [0, 0, -0.25] }); // a swept crest
   } else if (kind === CRAB) {
     // ---- SHARDCLAW, the crystal crab-beast ----
     main = "#3d3378";

@@ -60,14 +60,14 @@ function drive(runs, frames) {
   }
 }
 
-test("the wire: a seat's numbers survive the trip; the host's pick fits a byte; the ape's look rides four frames", () => {
+test("the wire: a seat's numbers survive the trip; the host's pick fits a byte; the ape's look (its hair too) rides five frames", () => {
   const I = new Float64Array([1, -1, 1, 0, 1]), O = new Float64Array(5);
   decode(encode(I, 0), 0, O);
   assert.deepEqual(Array.from(O), [1, -1, 1, 0, 1]);
   decode(encode(new Float64Array(5), 0), 0, O);
   assert.deepEqual(Array.from(O), [0, 0, 0, 0, 0], "a still stick reads 0");
   for (const m of [[0, 1], [6, 0], [3, 1]]) assert.deepEqual(Object.values(unpackMode(packMode(...m))), m);
-  const look = { fur: 11, trim: 7, pattern: 4, face: 3, gear: 0b10110101 };
+  const look = { fur: 11, trim: 7, pattern: 4, face: 3, gear: 0b10110101, hair: 3, hairc: 6 };
   let acc = 0;
   for (let f = 0; f < LOOK_FRAMES; f++) acc = takeLook(acc, encode(I, 0, lookBits(look, f)), f);
   assert.deepEqual(lookOf(acc), look);

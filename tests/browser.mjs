@@ -123,10 +123,11 @@ try {
   await p.keyboard.down("ArrowLeft");
   await until(p, (x0) => game.scene.run.MV[1][0] < x0 - 1, x0, "the arrows drive it");
   await p.keyboard.up("ArrowLeft");
-  // Reload: the garage change and the cleared city persist.
+  // Reload: the garage change (the hair too) and the cleared city persist.
+  await p.evaluate(() => (game.setPart("hair", 2), game.setPart("hairc", 3)));
   await p.reload();
   await until(p, () => window.game, null, "reloads");
-  assert.deepEqual(await p.evaluate(() => [game.profile.look.fur, game.profile.cleared, game.getSnapshot().start]), [1, ["port-lumen"], 1], "persists; the run can start from city 2");
+  assert.deepEqual(await p.evaluate(() => [game.profile.look.fur, game.profile.cleared, game.getSnapshot().start, game.profile.look.hair, game.profile.look.hairc]), [1, ["port-lumen"], 1, 2, 3], "persists (the hair too); the run can start from city 2");
   // Recall.
   await p.evaluate(() => game.destroy());
   assert.equal(await p.evaluate(() => document.body.innerHTML === window.before), true, "Recall gives the page back");
@@ -193,7 +194,7 @@ try {
     }
   }
   await ph.close();
-  console.log("CitySmash: browser green (title settles, garage + lock + code, start, climb + punch to a hole, eat, a building falls, city 2 loads, unlocks saved, 2P joins, reload persists, Recall, phone pad stick + JUMP, taps smash, whiff and eat, hero ≥ 1/5, full height at 390 portrait and landscape).");
+  console.log("CitySmash: browser green (title settles, garage + lock + code, start, climb + punch to a hole, eat, a building falls, city 2 loads, unlocks saved, 2P joins, reload persists (hair too), Recall, phone pad stick + JUMP, taps smash, whiff and eat, hero ≥ 1/5, full height at 390 portrait and landscape).");
 } finally {
   await browser.close();
   await server.close();

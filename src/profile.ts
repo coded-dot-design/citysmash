@@ -3,10 +3,10 @@
 // (`normalize`), never written over by an older game when a newer one saved it; an export code
 // (CS1-…, with a checksum) moves it to another device. Clearing a city unlocks garage parts (UNLOCKS)
 // and lets a run start from the next city.
-import { FURS, TRIMS, PATTERNS, FACES, GEAR, LOOK0, type Look } from "./monster.ts";
+import { FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, LOOK0, type Look } from "./monster.ts";
 import { CITIES, NCITY } from "./cities.ts";
 
-export const VERSION = 1;
+export const VERSION = 2;
 export interface Profile {
   v: number;
   look: Look;
@@ -26,7 +26,7 @@ export const local: Store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* no storage: play on, unsaved */ } },
 };
 /** What you own from the start. */
-export const BASE = ["fur:0", "fur:1", "fur:2", "trim:0", "trim:1", "trim:2", "pattern:0", "pattern:1", "face:0", "face:1", "gear:0", "gear:1"];
+export const BASE = ["fur:0", "fur:1", "fur:2", "trim:0", "trim:1", "trim:2", "pattern:0", "pattern:1", "face:0", "face:1", "gear:0", "gear:1", ...HAIRS.map((_, i) => "hair:" + i), ...TRIMS.map((_, i) => "hairc:" + i)];
 /** What each city unlocks the first time it is flat. */
 export const UNLOCKS: string[][] = [
   ["fur:3", "trim:3", "gear:2"],
@@ -37,20 +37,20 @@ export const UNLOCKS: string[][] = [
   ["fur:8", "fur:9", "pattern:4", "trim:6", "gear:6"],
   ["fur:10", "fur:11", "face:4", "trim:7", "gear:7"],
 ];
-const KINDS = { fur: FURS.length, trim: TRIMS.length, pattern: PATTERNS.length, face: FACES.length, gear: GEAR.length } as const;
+const KINDS = { fur: FURS.length, trim: TRIMS.length, pattern: PATTERNS.length, face: FACES.length, gear: GEAR.length, hair: HAIRS.length, hairc: TRIMS.length } as const;
 export type Part = keyof typeof KINDS;
 /** A part's name for the garage and the city card. */
 export function partName(tag: string) {
   const [k, i] = tag.split(":") as [Part, string], n = +i;
-  return k === "fur" ? `${FURS[n]!.name.toUpperCase()} FUR` : k === "trim" ? `${TRIMS[n]!.name.toUpperCase()} TRIM` : k === "pattern" ? `${PATTERNS[n]!.name} PATTERN` : k === "face" ? `${FACES[n]!.name} FACE` : GEAR[n]!.name;
+  return k === "fur" ? `${FURS[n]!.name.toUpperCase()} FUR` : k === "trim" ? `${TRIMS[n]!.name.toUpperCase()} TRIM` : k === "hair" ? `${HAIRS[n]!.name} HAIR` : k === "hairc" ? `${TRIMS[n]!.name.toUpperCase()} HAIR` : k === "pattern" ? `${PATTERNS[n]!.name} PATTERN` : k === "face" ? `${FACES[n]!.name} FACE` : GEAR[n]!.name;
 }
 /** The city that unlocks a part (−1: owned from the start). */
 export const unlockedBy = (tag: string) => UNLOCKS.findIndex((u) => u.includes(tag));
 
 export const fresh = (): Profile => ({ v: VERSION, look: { ...LOOK0 }, owned: BASE.slice(), cleared: [], best: 0, rivals: 1, stats: { runs: 0, buildings: 0, snacks: 0, helis: 0 } });
 
-/** Version steps, in order: each takes the save from v to v + 1 (none yet: v1 is the first). */
-const STEPS: Record<number, (p: any) => any> = {};
+/** Version steps, in order: each takes the save from v to v + 1. 1 → 2: the hair (none yet, a pink to pick). */
+const STEPS: Record<number, (p: any) => any> = { 1: (p) => ({ ...p, v: 2, look: { ...p.look, hair: 0, hairc: LOOK0.hairc } }) };
 export function migrate(p: any): any {
   let q = { ...p, v: typeof p.v === "number" ? p.v : 1 };
   while (q.v < VERSION && STEPS[q.v]) q = STEPS[q.v]!(q);
@@ -58,7 +58,7 @@ export function migrate(p: any): any {
 }
 const okTag = (s: unknown): s is string => {
   if (typeof s !== "string") return false;
-  const m = /^(fur|trim|pattern|face|gear):(\d+)$/.exec(s);
+  const m = /^(fur|trim|pattern|face|gear|hair|hairc):(\d+)$/.exec(s);
   return !!m && +m[2]! < KINDS[m[1] as Part];
 };
 const clampI = (n: unknown, max: number, d: number) => (Number.isInteger(n) && (n as number) >= 0 && (n as number) < max ? (n as number) : d);
@@ -73,7 +73,7 @@ export function normalize(p: any): Profile {
   const num = (v: unknown) => (Number.isFinite(v) ? Math.max(0, Math.floor(v as number)) : 0);
   return {
     v: VERSION,
-    look: { fur: pick("fur", LOOK0.fur), trim: pick("trim", LOOK0.trim), pattern: pick("pattern", LOOK0.pattern), face: pick("face", LOOK0.face), gear },
+    look: { fur: pick("fur", LOOK0.fur), trim: pick("trim", LOOK0.trim), pattern: pick("pattern", LOOK0.pattern), face: pick("face", LOOK0.face), gear, hair: pick("hair", LOOK0.hair), hairc: pick("hairc", LOOK0.hairc) },
     owned,
     cleared: Array.isArray(p.cleared) ? ids.filter((id) => p.cleared.includes(id)) : [],
     best: Math.min(99_999_999, num(p.best)),
