@@ -100,6 +100,9 @@ try {
           const M = r.MV[k], fl = 3;
           M[5] = 2; M[12] = b; M[22] = s; M[0] = r.wallX(b, s); M[2] = -0.55; M[6] = -s; M[1] = fl + 0.5 - 1.9; M[8] = 0; M[33] = 0; M[7] = 100; M[15] = 0; M[23] = 0; M[20] = 0; M[34] = 0; M[11] = 0;
           step(30);
+          // The camera (it follows the monster in play, easing) settles first: a pan of half a pixel between the
+          // frames below shifts every window edge and would read as cover.
+          for (let q = sc.project(x0, 5, 0)[0], n = 0; n++ < 600; ) { step(1); const v = sc.project(x0, 5, 0)[0]; if (Math.abs(v - q) < 0.005) break; q = v; }
           // Mid-climb: the shimmy at a point of its cycle (held still: only the pose moves).
           if (climb) for (let i = 0; i < 12; i++) (M[33] = 1), (M[13] = climb + i * 0.05), (M[1] = fl + 0.5 - 1.9), step(1);
           const shot = () => {
