@@ -22,7 +22,17 @@ const KIT = `window.kit = (sc) => {
   const count = () => { const d = cx.getImageData(0, 0, cv.width, cv.height).data; let n = 0; for (let q = 0; q < d.length; q += 4) if (d[q + 1] < 25 && d[q] > 90 && Math.abs(d[q] - d[q + 2]) < 16) n++; return n; };
   /** Pixels of part o (tinted magenta): [with the scene, with fn() undone after]. */
   const px = (o, hide) => { const was = o.tint; o.tint = "#ff00ff"; sc.dio.draw(); const a = count(); const back = hide(); sc.dio.draw(); const b = count(); back(); o.tint = was; sc.dio.draw(); return [a, b]; };
-  return { count, px };
+  /** The engine stopped and its clock held: step(n) runs n frames of 1/60 s from time 0, done() gives the clock back.
+   *  The rig's breath and a shock's shake and flicker read engine.time, which otherwise holds however long the page
+   *  ran before the test stopped it (the 76-78% runs of v11 and v12 were a shocked pose at a chance phase). */
+  const hold = () => {
+    sc.engine.stop();
+    const d = Object.getOwnPropertyDescriptor(sc.engine, "time");
+    let t = 0;
+    Object.defineProperty(sc.engine, "time", { get: () => t, configurable: true });
+    return { step: (n) => { for (let i = 0; i < n; i++) (t += 1 / 60), sc.engine.advance(1 / 60); }, done: () => (Object.defineProperty(sc.engine, "time", d), sc.engine.start()) };
+  };
+  return { count, px, hold };
 };`;
 try {
   for (const [w, h] of [[1440, 900], [390, 844]]) {
@@ -36,9 +46,11 @@ try {
       await p.evaluate((ci) => game.play(ci), ci);
       await p.waitForFunction(() => game.scene?.state.drawn);
       const res = await p.evaluate((tanks) => {
-        const sc = game.scene, r = sc.run, K = kit(sc), out = [];
-        sc.engine.stop();
-        const step = (n) => { for (let i = 0; i < n; i++) sc.engine.advance(1 / 60); };
+        const sc = game.scene, r = sc.run, K = kit(sc), out = [], { step, done } = K.hold();
+        // No live windows: each of the seven punches lands as a punch. A live one shocks him off the wall (and the
+        // next punches, re-hung, measured a shocked ape: arms up, rolling, no punch at all).
+        const live = r.LIVE.slice();
+        r.LIVE.fill(0);
         r.S[0] = 1;
         for (let j = 0; j < 4; j++) (r.MV[j][24] = j === 0 ? 1 : 0), (r.MV[j][28] = 9);
         r.MV[0][28] = 0;
@@ -55,7 +67,7 @@ try {
         for (const b of [...new Set([1, nb - 2, ...tanks])]) for (const s of [-1, 1]) {
           r.cell.fill(2); r.B.fill(0); r.occ.fill(0); r.HIT.fill(0); r.SO.fill(0); r.CH.fill(0);
           const fl = Math.min(2, r.BLD[b * 4 + 2] - 2);
-          const hang = () => { M[5] = 2; M[12] = b; M[22] = s; M[0] = r.wallX(b, s); M[2] = -0.55; M[6] = -s; M[1] = fl + 0.5 - 1.9; M[3] = 0; M[4] = 0; M[7] = 100; M[8] = 0; M[33] = 0; M[20] = 0; M[34] = 0; };
+          const hang = () => { M[5] = 2; M[12] = b; M[22] = s; M[0] = r.wallX(b, s); M[2] = -0.55; M[6] = -s; M[1] = fl + 0.5 - 1.9; M[3] = 0; M[4] = 0; M[7] = 100; M[8] = 0; M[33] = 0; M[20] = 0; M[34] = 0; M[9] = 0; M[10] = 0; M[11] = 0; M[15] = 0; M[19] = 0; M[23] = 0; };
           hang();
           step(90);
           // From straight in front and with the camera off to either side (two players apart, the street's ends):
@@ -79,7 +91,8 @@ try {
             if (M[38] === c + 1) at("punch " + c);
           }
         }
-        sc.engine.start();
+        r.LIVE.set(live);
+        done();
         return out;
       }, tankKit(ci));
       for (const o of res) {
@@ -104,9 +117,7 @@ try {
     // The street's little things against the ape on the street: a parachute behind him (nearer the buildings)
     // draws behind his torso, one in front of him over it; a soldier at his feet behind him, behind his legs.
     const st = await p.evaluate(() => {
-      const sc = game.scene, r = sc.run, K = kit(sc);
-      sc.engine.stop();
-      const step = (n) => { for (let i = 0; i < n; i++) sc.engine.advance(1 / 60); };
+      const sc = game.scene, r = sc.run, K = kit(sc), { step, done } = K.hold();
       const M = r.MV[0], rig = sc.rig(0), x = r.BLD[4] - 1.3;
       M[5] = 0; M[6] = 1; M[0] = x; M[1] = 0; M[2] = 1.9; M[3] = 0; M[7] = 100;
       r.SO.fill(0); r.CH.fill(0);
@@ -114,7 +125,7 @@ try {
       const chute = (z) => { r.CH.fill(0); r.CH.set([1, x + 0.2, 2.2, z, 0, 0, 1, 0, 1], 0); step(1); const v = K.px(rig.tor, () => { const c = r.CH[0]; r.CH[0] = 0; step(1); return () => ((r.CH[0] = c), step(1)); }); r.CH.fill(0); return v; };
       const soldier = (z) => { r.SO.fill(0); r.SO.set([1, x + 0.3, z, 1, 0, 0, 0, 0], 0); step(1); const v = K.px(rig.root, () => { const c = r.SO[0]; r.SO[0] = 0; step(1); return () => ((r.SO[0] = c), step(1)); }); r.SO.fill(0); return v; };
       const out = { behind: chute(0.3), front: chute(3.4), soldierBehind: soldier(1.2) };
-      sc.engine.start();
+      done();
       return out;
     });
     if (process.env.DEPTH_DEBUG) console.log(w, JSON.stringify(st));

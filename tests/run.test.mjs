@@ -606,11 +606,17 @@ test("the run allocates nothing per step", async () => {
       run.clear();
     }
   };
+  // The warm-up is the measured run itself, from the same seed, three times over: every branch the sampled steps
+  // take (each city, its rare events) has run and V8 has tiered it up before the sampling starts. A warm-up on
+  // other steps left first-seen branches to the sampled window: their one-off feedback and deopts (16 KB
+  // blamed on whatever function, ~2 runs in 10 over the 40 KB line), not a per-step allocation.
+  const same = () => (run.reset(20261116, 0, 1), go(60 * 180));
   go(60 * 600);
+  for (let k = 0; k < 3; k++) same();
   const s = new Session();
   s.connect();
   await s.post("HeapProfiler.startSampling", { samplingInterval: 64 });
-  go(60 * 180);
+  same();
   const { profile } = await s.post("HeapProfiler.stopSampling");
   s.disconnect();
   const mine = [];
