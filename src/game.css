@@ -56,17 +56,22 @@
 .cs .cs-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0}
 .cs .cs-row .bui-key{min-height:44px;padding:0 1.1em;font:inherit}
 .cs .cs-pad{--u:.62px;display:none}
-.cs .cs-pad .bui-pad-keys{max-width:none;flex-wrap:nowrap}
-.cs .cs-pad svg{width:1.5em;height:1.5em;fill:currentColor;stroke:none}
+.cs .cs-pad .bui-pad-keys{position:relative;display:block;flex:none;width:128px;height:124px;max-width:none}
+.cs .cs-pad .bui-pad-keys .bui-arcade{position:absolute;width:50px;height:50px}
+.cs .cs-pad .bui-pad-keys .bui-primary{right:0;bottom:0;width:76px;height:76px}
+.cs .cs-pad [data-i="1"]{right:78px;bottom:31px}
+.cs .cs-pad [data-i="2"]{right:41px;bottom:74px}
+.cs .cs-pad .bui-arcade svg{width:28px;height:28px;fill:currentColor;stroke:none}
+.cs .cs-pad .bui-primary svg{width:44px;height:44px}
 @media (pointer:coarse){.cs .cs-pad{display:flex}}
 @container stage (aspect-ratio<7/5){
-.cs .cs-scene-host>*{--padh:clamp(104px,24cqh,128px)}
+.cs .cs-scene-host>*{--padh:clamp(112px,24cqh,134px)}
 .cs .cs-canvas,.cs .cs-play{height:calc(100cqh - var(--padh))}
 .cs .cs-hud{font-size:clamp(10px,3.1cqw,13px)}
 .cs .cs-head{right:104px}
 .cs .cs-hint{white-space:normal}
 .cs .cs-mon u{width:2.6em}
-.cs .cs-pad{display:flex;--u:.72px;gap:calc(8 * var(--u));padding-inline:calc(8 * var(--u))}
+.cs .cs-pad{display:flex;--u:.72px;gap:calc(8 * var(--u));padding-inline:calc(8 * var(--u));padding-bottom:max(6px,env(safe-area-inset-bottom))}
 .cs .cs-card{top:calc((100cqh - var(--padh)) / 2);font-size:.86em}
 .cs .cs-toast{top:calc((100cqh - var(--padh)) * .42)}
 }

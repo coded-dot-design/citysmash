@@ -23,7 +23,7 @@ import {
   E_START, E_HOLE, E_SHAKE, E_FLOOR, E_FLAT, E_HELI, E_HELI_CRASH, E_NOM, E_HURT, E_FLING, E_DROP, E_KO, E_END, E_STOMP, E_JUMP, E_LAND, E_CLIMB,
   E_SHOCK, E_TANK, E_BONK, E_BURN, E_JOIN, E_CHIP_, E_CRACK_, E_ARMOUR, E_TRAIN, E_BELLS, E_RAM, E_TRUCK, E_SURGE, E_CITY, E_CLEAR, E_PUNCH,
   E_POWER, E_KNOCKOFF, E_POUNCE, E_COMBO_HIT, E_TELL, T_RIVAL, T_RIVAL_END, DUMMY, T_TANK, TANK_HITS, TANK_ARMOUR, T_FOE, T_TRUCK, T_GROUND_END,
-  NI, NR, NG, P_ALL, E_LEAP, LEVEL0, LEVELS, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
+  NI, NR, NG, P_ALL, REACH, E_LEAP, LEVEL0, LEVELS, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
@@ -32,6 +32,10 @@ import { buildMonster, monName, shade, WALL, TRIMS, HELD, type Look, type Monste
 const TAU = 6.283185307179586;
 /** Practice's steps, in ./round.ts P_* order. */
 const PRACTICE = ["Walk", "Jump onto a building's side", "Climb it", "Punch all 7 reach cells", "Grab someone at a window", "Swat the parked helicopter", "Punch past a live (sparking) window", "Power punch the sparring dummy (tap it)", "Pounce on the dummy (jump onto it)", "Leap to the next building (jump on a wall)", "Double-tap jump to let go"];
+/** v18, the same steps on a phone (the pad's three buttons: ✊ punch, ✋ grab, ⤒ jump; the stick aims on a wall). */
+const PRACTICE_TOUCH = ["Walk (the stick)", "Jump onto a building's side (⤒)", "Climb it (hold the stick up)", "Punch all 7 reach cells (flick the stick to aim, ✊ punch)", "Grab someone at a window (aim, ✋ grab)", "Swat the parked helicopter (tap it)", "Punch past a live (sparking) window", "Power punch the sparring dummy (✊ by it)", "Pounce on the dummy (⤒ onto it)", "Leap to the next building (⤒ on a wall)", "Double-tap ⤒ to let go"];
+/** v18: the touch aim's hint shows once a page load (the first wall on a phone). */
+let aimHinted = false;
 const mix = (a: string, b: string, k: number) => {
   const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), f = (s: number) => Math.round(((x >> s) & 255) * (1 - k) + ((y >> s) & 255) * k).toString(16).padStart(2, "0");
   return "#" + f(16) + f(8) + f(0);
@@ -132,6 +136,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   run.reset(so.seed ?? 20261116, so.first ?? 0, so.rivals ?? 1, so.practice ? 1 : 0, so.level ?? LEVEL0);
   if (so.attract) S[27] = 1;
   let built = -1, P: Pal = palette(CITIES[S[16]!]!, light());
+  const coarse = typeof matchMedia === "function" && matchMedia("(pointer:coarse)").matches;
   const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1;
   const net = so.net ?? null;
 
@@ -146,7 +151,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   const hud = L.add(document.createElement("div"));
   hud.className = "cs-hud";
   hud.hidden = !!so.attract;
-  hud.innerHTML = `<div class="cs-head"><p class="cs-top"><b class="cs-chip cs-city"><span></span><em></em></b><b class="cs-chip cs-team"><em>SCORE</em><span>0</span></b><b class="cs-chip cs-flat"><span>0%</span><em>FLAT</em></b></p><p class="cs-mons">${[0, 1, 2, 3].map((k) => `<b class="cs-chip cs-mon cs-m${k}" hidden><i></i><em></em><u><s></s></u><span>0</span></b>`).join("")}</p><p class="cs-hint"></p><div class="cs-prac" hidden><b>PRACTICE</b> <small>nothing hurts · ☰ to leave</small><ol>${PRACTICE.map((t) => `<li>${t}</li>`).join("")}</ol><p class="cs-dots" aria-label="Reach cells punched">${"<i></i>".repeat(NR)}</p></div></div>`
+  hud.innerHTML = `<div class="cs-head"><p class="cs-top"><b class="cs-chip cs-city"><span></span><em></em></b><b class="cs-chip cs-team"><em>SCORE</em><span>0</span></b><b class="cs-chip cs-flat"><span>0%</span><em>FLAT</em></b></p><p class="cs-mons">${[0, 1, 2, 3].map((k) => `<b class="cs-chip cs-mon cs-m${k}" hidden><i></i><em></em><u><s></s></u><span>0</span></b>`).join("")}</p><p class="cs-hint"></p><div class="cs-prac" hidden><b>PRACTICE</b> <small>nothing hurts · ☰ to leave</small><ol>${(coarse ? PRACTICE_TOUCH : PRACTICE).map((t) => `<li>${t}</li>`).join("")}</ol><p class="cs-dots" aria-label="Reach cells punched">${"<i></i>".repeat(NR)}</p></div></div>`
     + `<p class="cs-toast" hidden></p><p class="cs-live" aria-live="polite"></p><p class="cs-keys"><button type="button" class="cs-key cs-menu" aria-label="Menu (Escape)">☰</button><button type="button" class="cs-key cs-mute" aria-label="Mute (M)" aria-pressed="true">♪</button></p>`
     + `<div class="cs-card cs-ccard" role="dialog" aria-label="City flattened" hidden><small></small><b></b><p class="cs-t"></p><p class="cs-next"></p><p class="cs-unl"></p><p class="cs-go-say"></p></div>`
     + `<div class="cs-card cs-end" role="dialog" aria-label="Run over" hidden><b></b><p class="cs-t"></p><ol class="cs-board"></ol><p class="cs-stats"></p><p class="cs-row"><button type="button" class="bui-key cs-again">PLAY AGAIN</button><button type="button" class="bui-key cs-retry"></button><button type="button" class="bui-key cs-tomenu">MENU</button></p></div>`;
@@ -172,12 +177,20 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   if (so.sound === false || so.attract) snd.on = false;
   const c = controls(engine, { keys: { left: [], right: [], up: [], down: [], punch: [], jump: [], grab: [] }, target: play });
   const PUNCH = c.id("punch"), JUMP = c.id("jump"), GRAB = c.id("grab");
-  const ICON_JUMP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 12h5v8h6v-8h5z" fill="currentColor"/></svg>';
+  const svg = (b: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${b}</svg>`;
+  const ICON_JUMP = svg('<path d="M12 2 3.5 11H9v6h6v-6h5.5z"/><rect x="7" y="19" width="10" height="2.6" rx="1.3"/>');
+  const ICON_FIST = svg('<circle cx="6.6" cy="8" r="2.6"/><circle cx="10.6" cy="7" r="2.6"/><circle cx="14.6" cy="7" r="2.6"/><circle cx="18.4" cy="8" r="2.5"/><path d="M4 9h17v6.5a5.5 5.5 0 0 1-5.5 5.5H9a5 5 0 0 1-5-5z"/><path d="M8.6 8.4v3M12.6 8v3.4M16.5 8.4v3M5 14h9.5" style="fill:none;stroke:var(--c);stroke-width:1.5;stroke-linecap:round"/>');
+  const ICON_HAND = svg('<rect x="5.4" y="4.6" width="3" height="10" rx="1.5"/><rect x="9.1" y="2.4" width="3" height="11" rx="1.5"/><rect x="12.8" y="3" width="3" height="11" rx="1.5"/><rect x="16.5" y="5.4" width="2.8" height="9" rx="1.4"/><path d="M5.4 11h13.9v4.6a6.4 6.4 0 0 1-6.4 6.4h-1.2c-2.1 0-3.6-.9-4.8-2.4L2.4 14.4a1.6 1.6 0 0 1 2.4-2.1l.6.6z"/>');
   const thePad = pad(engine, c, {
     scheme: "stick",
     move: ["up", "down", "left", "right"],
-    // Move and jump only: everything else is a tap on what to smash or grab.
-    actions: [{ intent: "jump", label: "JUMP", icon: ICON_JUMP, name: "Jump (Space)", key: "Space", role: "go" }],
+    // v18: the right thumb's cluster: the big PUNCH, GRAB and JUMP in an arc round it (the keys' J, K, Space);
+    // on a wall the stick aims (a flick steps the aim box a cell, held it climbs: stickAim). Taps still work too.
+    actions: [
+      { intent: "punch", label: "", icon: ICON_FIST, name: "Punch the aimed window (J)", key: "J", role: "go" },
+      { intent: "grab", label: "", icon: ICON_HAND, name: "Grab and eat (K)", key: "K", role: "sys" },
+      { intent: "jump", label: "", icon: ICON_JUMP, name: "Jump (Space): on a wall, leap; twice, let go", key: "Space", role: "cmd" },
+    ],
     host: stage,
   });
   thePad.el.classList.add("cs-pad");
@@ -1067,8 +1080,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     if (was[3] !== ph) {
       was[3] = ph;
       const touch = !!thePad.el.offsetParent;
-      hintEl.textContent = ph === READY ? (touch ? "↑ at a wall grabs it · ✊ punches the window next to you · ✋ eat a snack · sparks bite" : "J punch · K grab · Space jump (on a wall: leap; twice: let go) · Tab/Q-E aim · WASD move · or click") : "";
+      hintEl.textContent = ph === READY ? (touch ? "↑ at a wall grabs it · ✊ punch · ✋ grab · ⤒ jump · or tap what to smash" : "J punch · K grab · Space jump (on a wall: leap; twice: let go) · Tab/Q-E aim · WASD move · or click") : "";
     }
+    if (aimShown !== aimHint > 0) (aimShown = aimHint > 0), (hintEl.textContent = aimShown ? "Flick the stick: move the target box · hold it: climb · ✊ punch · ✋ grab" : "");
     // The card between cities.
     if (ph === CLEAR && cardUp !== ci) {
       cardUp = ci;
@@ -1718,7 +1732,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
    *  mouse's cell, a miss's ring. */
   /** v12: fight pops shown so far (tests): BOOM!, KNOCKED OFF!, POUNCE!; the wall's grab outline's time left, and where it last was. */
   const fights = [0, 0, 0];
-  let wallShow = 0, wallKey = -1;
+  let wallShow = 0, wallKey = -1, aimHint = 0, aimShown = false, padOn = false;
   const leaps = [0, 0, 0, 0];
   let tapK = 0, tapT = 0, tapF = 0, hoverC = -1, hoverG = false, hoverT = 0, missF = 0, missX = 0, missY = 0, pops = 0, hint = "", tapFace = 0;
   /** This screen's own monster (online its seat's, else seat one's). */
@@ -1982,6 +1996,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       const stick = c.stick.active;
       I1[0] = GP[0]! || (stick ? c.stick.x : c.axis("left", "right"));
       I1[1] = -GP[1]! || (stick ? -c.stick.y : c.axis("down", "up"));
+      if (stick) stickAim(I1, own());
+      else SK[0] = SK[1] = SK[2] = 0;
       // A press punches once; held, it keeps punching at the punch's own steady rhythm.
       I1[2] = c.hit(PUNCH) || c.down(PUNCH) || GP[2]! || GP[5]! ? 1 : 0;
       I1[3] = c.hit(JUMP) || GP[3]! ? 1 : 0;
@@ -2035,6 +2051,42 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     if (I[o + 2] && Math.abs(I[o + 1]!) < 0.5) I[o + 5] = T_CELL + a;
     else if (I[o + 4] && !I[o + 2] && i >= 0 && run.occ[i] && run.cell[i] !== HOLE) I[o + 5] = T_GRAB + a;
   }
+  /** v18, the touch stick on a wall (seat one, a phone): the aim box moves like the keys' Q/E do, on the screen's grid.
+   *  A flick (a push past half way) steps the aim one cell that way (up, down, left, right: the nearest unbroken
+   *  window in that row or column) and the monster stays put; held past HOLD (0.3 s), or pushed past the reach's edge
+   *  (up from the top row, down from the bottom one), the stick moves as before: it climbs. Off a wall it walks as
+   *  ever, and a push that began off the wall (up at a wall grabs it and climbs on) keeps climbing. The stick's numbers
+   *  are this screen's input, read before the step like a key (the run, online and rollback see only the frame).
+   *  SK: [0] the push's way (0 none, 1 up, 2 down, 3 left, 4 right), [1] steps held, [2] 1 once it moves. */
+  const SK = new Float64Array(3), HOLD = 18;
+  function stickAim(I: Float64Array, O: Float64Array) {
+    const x = I[0]!, y = I[1]!, ax = Math.abs(x), ay = Math.abs(y), w = SK[0]!;
+    const keep = w === 1 ? y > 0.3 : w === 2 ? y < -0.3 : w === 3 ? x < -0.3 : w === 4 ? x > 0.3 : false;
+    const d = keep ? w : Math.max(ax, ay) < 0.5 ? 0 : ay >= ax ? (y > 0 ? 1 : 2) : x > 0 ? 4 : 3;
+    const wall = O[5] === CLIMB && O[24] === IN && aimOf(0, O) >= 0;
+    if (!d) {
+      SK[0] = SK[1] = SK[2] = 0;
+      if (wall) I[0] = I[1] = 0;
+      return;
+    }
+    if (d !== w) (SK[0] = d), (SK[1] = 0), (SK[2] = wall && aimGo(O, d) ? 0 : 1);
+    if ((SK[1] = SK[1]! + 1) >= HOLD) SK[2] = 1;
+    if (wall && !SK[2]) I[0] = I[1] = 0;
+  }
+  /** Step seat one's aim one cell on the screen (d as SK[0]); false at the reach's edge that way. */
+  function aimGo(O: Float64Array, d: number) {
+    const a = AIMS[0]!, f = REACH[a * 2]!, col = REACH[a * 2 + 1]!, df = d === 1 ? 1 : d === 2 ? -1 : 0, dc = d < 3 ? 0 : (d === 4) === O[22]! < 0 ? 1 : -1;
+    for (let r = f + df, k = col + dc; r >= -1 && r <= 1 && k >= 1 && k <= 3; df ? (r += df) : (k += dc)) {
+      let best = -1, bd = 9;
+      for (let c = 0; c < NR; c++) {
+        if (REACH[c * 2] !== r || !aimOk(O, c, true)) continue;
+        const e = Math.abs(REACH[c * 2 + 1]! - k);
+        if ((df || e === 0) && e < bd) (bd = e), (best = c);
+      }
+      if (best >= 0) return (AIMS[0] = best), (dirty = true), true;
+    }
+    return false;
+  }
   function gamepadRead() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : null;
     for (let s = 0; s < SEATS; s++) GP[s * 6] = GP[s * 6 + 1] = 0;
@@ -2074,6 +2126,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         const sr = stage.getBoundingClientRect(), head = hud.firstElementChild!.getBoundingClientRect(), cr = getComputedStyle(canvas).position === "absolute" ? canvas.getBoundingClientRect() : sr;
         dio.resize(cr.width || 1, cr.height || 1, Math.min(2, devicePixelRatio || 1) * (V[2] || 1));
         V[3] = Math.max(8, head.bottom - sr.top + 8);
+        padOn = !!thePad.el.offsetParent;
         sky = null;
         frame();
         hudDirty = dirty = true;
@@ -2099,6 +2152,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       {
         const O = own(), key = O[5] === CLIMB && O[24] === IN ? O[12]! * 1000 + run.levelRow(O) * 2 + (O[22]! > 0 ? 1 : 0) : -1;
         if (key !== wallKey) (wallKey = key), key >= 0 && !so.attract && (wallShow = 1.5);
+        // v18: the first wall on a phone says how the stick aims (once a page load).
+        if (key >= 0 && !aimHinted && !so.attract && !net && padOn) (aimHinted = true), (aimHint = 6);
+        if (aimHint > 0) (aimHint = Math.max(0, aimHint - dt)), (moving = true);
         if (wallShow > 0) (wallShow = Math.max(0, wallShow - dt)), (moving = true);
       }
       if (tapF > 0 || missF > 0) {
