@@ -79,9 +79,10 @@ export interface RigInk { ink: string; eye: string; pupil: string; teeth: string
 export interface Wall { yaw: number; ox: number; oz: number; lean: number; lunge: number; come: number[]; far: number[]; fleg: number[]; nleg: number[]; rest: number[]; wind: number[]; hit: number[]; neck: number }
 /** The depth (z) the scene anchors a held building's cluster at: behind it only the rigs on its walls. */
 export const HELD = 0.05;
-/** On a wall the renderer's forward shift (./scene.ts wallFwd) stops with the rig's root this far back; it
- *  comes out from the side wall by WALL_OUT of the shift. */
-export const FWD_Z = -0.8, WALL_OUT = 0.6;
+/** On a wall the renderer's forward shift (./scene.ts wallFwd) stops with the rig's root this far back (per
+ *  kind: a rival's feet reach further forward); it
+ *  comes out from the side wall by WALL_OUT of the shift (back in as the far punch brings him round the corner). */
+export const FWD_Z = [-0.6, -1, -0.8, -0.6], WALL_OUT = 0.4;
 export const WALL: Wall[] = [
   // the ape
   { yaw: 0.1, ox: -0.15, oz: -0.85, lunge: 1, lean: 0.15, come: [2, 0.2, 0.2], far: [1.105, -0.541, 2.107], fleg: [0.871, -0.25, -0.006], nleg: [1.033, -0.25, 0.353], rest: [-0.759, -0.108, 1.792], wind: [3.636, -1.51, 2.7, 2.593, 1.631, 2.7, -1.65, 2.67, 1.5, 2.253, 0.442, 2.548, 2.253, 0.442, 2.548, 3.7, -0.421, 2.627, 3.7, -0.421, 2.627], hit: [-0.039, -0.862, 1.586, 1.009, -0.847, 0, 1.412, -2.024, 0.81, 1.241, 1.407, 1.679, 1.017, -1.615, 0.242, 0.047, -0.489, 0.919, 0.816, -0.443, 0], neck: -1.2 },
@@ -367,10 +368,11 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     // drawn in front of the facade from a third of the way), at the hit its shoulder and head come past the corner
     // over the front face, back on the recovery.
     const lk = wall && punching && cell === 3 ? (M[34]! > 0 ? Math.min(1, pt / PUNCH_HIT) * 0.8 : 1 - (Math.max(0, (pt - PUNCH_HIT) / (PUNCH_CD - PUNCH_HIT) - 0.3) / 0.7) ** 2) : 0;
-    root.pos[0] = M[0]! + (wall ? f * (W.ox - fwd * WALL_OUT + W.lunge * lk) : f * pl * MK);
-    root.pos[1] = M[1]! + (wall ? (moving ? lift * 0.16 : br * 0.03) * MK : 0);
     // (forward only as far as keeps its feet and far hand on the side wall: the root no nearer than FWD_Z)
-    root.pos[2] = M[2]! + (wall ? W.oz + Math.min(fwd, Math.max(0, FWD_Z - M[2]! - W.oz)) + W.come[0]! * lk : 0);
+    const fz = wall ? Math.min(fwd, Math.max(0, FWD_Z[kind]! - M[2]! - W.oz)) : 0;
+    root.pos[0] = M[0]! + (wall ? f * (W.ox - fz * WALL_OUT * (1 - lk) + W.lunge * lk) : f * pl * MK);
+    root.pos[1] = M[1]! + (wall ? (moving ? lift * 0.16 : br * 0.03) * MK : 0);
+    root.pos[2] = M[2]! + (wall ? W.oz + fz + W.come[0]! * lk : 0);
     root.rot[1] = yaw;
     root.rot[2] = md === KO ? -1.35 : zap > 0 ? Math.sin(t * 60) * 0.06 : 0;
     // A shock flickers it light and dark; a hit flashes it white.

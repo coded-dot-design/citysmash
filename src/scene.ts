@@ -81,7 +81,7 @@ function palette(c: City, light: boolean) {
 type Pal = ReturnType<typeof palette>;
 const WORDS = ["CRUNCH!", "KRAK!", "SMASH!", "TIMBER!", "FLAT!", "SWAT!", "KA-BLAM!", "NOM!", "BOINK!", "STOMP!", "OOF!", "ZZAP!", "BONK!", "KER-THOOM!", "OUCH! HOT!", "POOF!", "CLANG!", "DERAILED!", "WHAM!", "+100", "+250", "BOOM!", "KNOCKED OFF!", "POUNCE!", "COMBO!", "!", "KRUNCH!"];
 /** The most the rig on a wall comes forward (and out) for its side wall seen strongly (./scene.ts wallFwd). */
-const WALL_FWD = 0.6;
+const WALL_FWD = 0.8;
 const W_CRUNCH = 0, W_TIMBER = 3, W_FLAT = 4, W_SWAT = 5, W_BLAM = 6, W_NOM = 7, W_BOINK = 8, W_STOMP = 9, W_OOF = 10, W_ZAP = 11, W_BONK = 12, W_THOOM = 13, W_HOT = 14, W_POOF = 15, W_CLANG = 16, W_DERAIL = 17, W_WHAM = 18, W_P100 = 19, W_P250 = 20, W_BOOM = 21, W_KNOCK = 22, W_POUNCE = 23, W_COMBO = 24, W_TELL = 25, W_KRUNCH = 26;
 const TOD = ["DAY", "DUSK", "NIGHT"];
 /** Bits of facade knocked off: they fall to the street and stay there as rubble (until the city changes). */
