@@ -39,6 +39,8 @@ export const COMBO = [1, 1.25, 1.5, 1.6], COMBO_GAP = 0.6;
 /** A swing or a grab at something out of reach costs this much more before the next one (spam does not pay). */
 export const WHIFF_T = 0.2;
 const GRAB_CD = 0.4, CARD_T = 4.2, FIGHT_T = 4;
+/** Numbers a monster in the autopilot's state (./createRun AS). */
+export const AW = 16;
 /** The autopilot's order through the reach: level close, medium, far, down close, medium, up close, medium. */
 const AI_ORDER = [0, 1, 2, 5, 6, 3, 4];
 /** Numbers per seat in IN: mx, my (−1..1, my up), punch, jump, grab (1 on the press), and a target (T_*). */
@@ -98,6 +100,23 @@ export const POWER_CD = 0.62, POWER_HIT = 0.36, POWER_HP = 16, COMBO_HP = 12, PO
 export const POUNCE_HP = 10, STUN_T = 1.4, POUNCE_LO = 1.1, POUNCE_HI = 3.8;
 /** The AI's moves: a power punch at most every AI_POWER s, a pounce after a crouch of POUNCE_TELL s (fixed: dodge it). */
 export const AI_POWER = 3.2, POUNCE_TELL = 0.4;
+/** v15 (owner: "We need easy, medium and hard. It is really hard right now. Also the rivals move very fast, faster than I
+ *  can move myself"): the level (S[33]: 0 EASY, 1 MEDIUM, 2 HARD) and the one table that drives it, a row a level:
+ *  [0] the rivals' speed on top of a player's own caps (the AI only decides inputs: never above 1), [1] their reaction (s
+ *  a player has to be near before they go for him), [2] their bonk / power punch / pounce cooldowns (×), [3] how often
+ *  one goes for a player when it could (else it keeps smashing), [4] the gap between its window punches (s; a player's
+ *  own is PUNCH_CD), [5] the damage a rival deals a player (×), [6] the soldiers at once in the first city, [7] the army's
+ *  ramp a city (× the city number), [8] its fire (× the time between shots), [9] its bullets' damage (×), [10] a player's
+ *  toughness (× every hit he takes: 0.7 is about 143 health), [11] the heal a snack (×), [12] a live window's shock.
+ *  Practice is EASY (and loses no health, as ever). */
+export const LEVELS = ["EASY", "MEDIUM", "HARD"], LEVEL0 = 1;
+export const DIFF = [
+  [0.7, 0.6, 2.2, 0.3, 0.5, 0.5, 1, 0.5, 1.6, 0.6, 0.65, 1.5, 3],
+  [0.85, 0.4, 1.2, 0.9, 0.28, 1, 3, 0.85, 1.1, 0.9, 0.95, 1.1, 5],
+  [1, 0.2, 1, 1, 0.26, 1.15, 3, 1, 1, 1, 1, 1, SHOCK_HP],
+];
+/** The AI's pacing (every level): a beat before it turns round, a short pause after each move, a taunt now and then. */
+export const AI_TURN = 0.2, AI_REST = 0.35, AI_TAUNT = 0.8;
 /** Is target t a punch (else a grab)? */
 export const isPunch = (t: number) => (t >= T_CELL && t < T_GRAB) || (t >= T_HELI && t < T_CHUTE) || (t >= T_STREET && t <= T_MISS) || (t >= T_LOW && t < T_GROUND_END);
 
@@ -117,7 +136,7 @@ export function createRun(seed = 20261116) {
    *  [16] city, [17] card timer, [18] cities cleared this run, [19] run time, [20] won, [21] first city, [22] rivals on, [23] trains,
    *  [24] trucks, [25] surges, [26] city start score, [27] attract (no end: the next city loops), [28] practice (./PRACTICE),
    *  [29] practice steps done (bits, ./P_*), [30] reach cells punched in practice (bits), [31] practice: a flat building's rebuild timer,
-   *  [32] practice: the sparring dummy is in (1). */
+   *  [32] practice: the sparring dummy is in (1), [33] v15: the level (./LEVELS). */
   const S = new Float64Array(34);
   /** Per monster (MW numbers each): [0] x, [1] y, [2] z, [3] vx, [4] vy, [5] mode, [6] face, [7] hp, [8] punch cooldown, [9] punch anim,
    *  [10] grab anim, [11] hurt, [12] on building, [13] walk phase, [14] grab cooldown, [15] invulnerable, [16] fist x, [17] fist y,
@@ -156,11 +175,14 @@ export function createRun(seed = 20261116) {
   const TR = new Float64Array(NT * 6);
   /** Spawn timers: [0] soldiers, [1] new people at windows. */
   const T = new Float64Array(2);
-  /** The autopilot, per monster: [0] target building, [1] side, [2] jump cool, [3] side tries, [4] grab cool, [5] bonk cool. */
-  const AS = new Float64Array(NM * 8), AV: Float64Array[] = [];
-  for (let k = 0; k < NM; k++) AV.push(AS.subarray(k * 8, k * 8 + 8));
+  /** The autopilot, per monster: [0] target building, [1] side, [2] jump cool, [3] side tries, [4] grab cool, [5] bonk cool,
+   *  [6] power punch cool, [7] pounce cool; v15, a rival the run drives only: [8] how long a player has been near (its
+   *  reaction), [9] a rest (no input), [10] its window punches' gap, [11] the way it last walked, [12] a turn round's beat,
+   *  [13] to its next taunt. */
+  const AS = new Float64Array(NM * AW), AV: Float64Array[] = [];
+  for (let k = 0; k < NM; k++) AV.push(AS.subarray(k * AW, k * AW + AW));
   let A = AV[0]!;
-  const ev = new Float64Array(96), IA = new Float64Array(NI), SAVE = new Float64Array(10), TG = new Float64Array(2), GC = new Float64Array(2);
+  const ev = new Float64Array(96), IA = new Float64Array(NI), SAVE = new Float64Array(AW + 2), TG = new Float64Array(2), GC = new Float64Array(2);
 
   function emit(t: number, v: number) {
     if (t === E_WHIFF) M[46] = 1;
@@ -205,6 +227,9 @@ export function createRun(seed = 20261116) {
   const nb = () => bk.L[0]!;
   const SXv = () => bk.L[3]!;
   const city = () => CITIES[S[16]!]!;
+  /** v15: the level's number i (./DIFF); how much of a hit monster O takes (a player: his toughness, from a rival its damage too). */
+  const Dv = (i: number) => DIFF[S[33]!]![i]!;
+  const took = (O: Float64Array) => (O[28] === AI ? 1 : Dv(10) * (M[28] === AI ? Dv(5) : 1));
 
   const run = {
     S, M: MV[0]!, MV, SO, PB, CH, HE, TK, FE, TR, AS, T, ev, n: 0, R, bk,
@@ -251,9 +276,10 @@ export function createRun(seed = 20261116) {
   }
 
   /** A new run from city `first`; `rivals` 1: the AI rivals come in (0: none); the drivers stay. */
-  function reset(s = seed, first = 0, rivals = 1, practice = 0) {
+  function reset(s = seed, first = 0, rivals = 1, practice = 0, level = LEVEL0) {
     R[0] = s >>> 0;
     S.fill(0);
+    S[33] = practice ? 0 : Math.max(0, Math.min(2, level | 0));
     S[21] = first;
     S[22] = practice ? 0 : rivals;
     S[28] = practice;
@@ -301,16 +327,17 @@ export function createRun(seed = 20261116) {
         if (S[28] && k === DUMMY) (O[24] = IN), (O[0] = -sx * 0.45 + 5.5), (O[6] = -1), (S[32] = 1);
       }
     }
-    for (let k = 0; k < NM * 8; k++) AS[k] = 0;
-    for (let k = 0; k < NM; k++) AS[k * 8] = -1;
+    AS.fill(0);
+    for (let k = 0; k < NM; k++) (AS[k * AW] = -1), (AS[k * AW + 13] = 3 + k * 1.7);
     setCur(0);
     SO.fill(0);
     PB.fill(0);
     CH.fill(0);
     HE.fill(0);
-    for (let h = 0; h < NH; h++) HE[h * 12 + 8] = Math.max(3, 6 - ci * 0.4) + h * 7;
+    const cr = ci * Dv(7);
+    for (let h = 0; h < NH; h++) HE[h * 12 + 8] = Math.max(3, 6 - cr * 0.4) + h * 7;
     TK.fill(0);
-    TK[4] = Math.max(5, 9 - ci * 0.6);
+    TK[4] = Math.max(5, 9 - cr * 0.6);
     FE.fill(0);
     FE[3] = 6;
     FE[8] = 5;
@@ -344,7 +371,7 @@ export function createRun(seed = 20261116) {
   }
   function hurt(n: number) {
     if (M[15]! > 0 || M[5] === KO || S[0] !== RUN || S[28]) return;
-    M[7] = Math.max(0, M[7]! - n);
+    M[7] = Math.max(0, M[7]! - n * (M[28] === AI ? 1 : Dv(10)));
     M[11] = 0.3;
     M[15] = 0.12;
     emit(E_HURT, n);
@@ -374,7 +401,7 @@ export function createRun(seed = 20261116) {
   /** A live part bites: a zap, a little health, it lets go and drops away from the wall. */
   function shock(at: number) {
     M[23] = 0.9;
-    if (!S[28]) M[7] = Math.max(0, M[7]! - SHOCK_HP);
+    if (!S[28]) M[7] = Math.max(0, M[7]! - (M[28] === AI ? SHOCK_HP : Dv(12)));
     M[11] = 0.3;
     M[15] = 0.5;
     S[12]!++;
@@ -678,7 +705,7 @@ export function createRun(seed = 20261116) {
   /** Monster j takes a punch: health, and off whatever it hangs on. */
   function bonk(j: number) {
     const O = MV[j]!;
-    O[7] = Math.max(S[28] ? 1 : 0, O[7]! - 6);
+    O[7] = Math.max(S[28] ? 1 : 0, O[7]! - 6 * took(O));
     O[11] = 0.3;
     O[54] = M[54] = FIGHT_T;
     if (O[5] === CLIMB || O[5] === ROOF) (O[5] = AIR), (O[12] = -1), (O[4] = 4), (O[3] = M[6]! * 5), (O[15] = 0.7), (O[58] = O[59] = 0);
@@ -723,7 +750,7 @@ export function createRun(seed = 20261116) {
   /** Monster j takes a hit in the fight: n health (the dummy never goes under 1), the health bars show. */
   function fightHit(j: number, n: number) {
     const O = MV[j]!;
-    O[7] = Math.max(S[28] ? 1 : 0, O[7]! - n);
+    O[7] = Math.max(S[28] ? 1 : 0, O[7]! - n * took(O));
     O[11] = 0.35;
     O[54] = M[54] = FIGHT_T;
     // A stunned or hit monster drops what it was doing (an AI's crouch, a wind-up).
@@ -914,7 +941,7 @@ export function createRun(seed = 20261116) {
     emit(E_WHIFF, 1);
   }
   function snack(hp: number, from: number) {
-    M[7] = Math.min(MAX_HP, M[7]! + hp);
+    M[7] = Math.min(MAX_HP, M[7]! + hp * (M[28] === AI ? 1 : Dv(11)));
     M[18] = 0.6;
     S[6]!++;
     M[26]!++;
@@ -941,14 +968,15 @@ export function createRun(seed = 20261116) {
 
   // ---- the army and the feature ----
   function stepArmy(dt: number) {
-    const t = S[1]!, ci = S[16]!, F = MV[nearest(0)]!, mx = F[0]!, sx = SXv(), feat = city().feature;
+    // (v15: the level's ramp: the army grows by that much of a city a city; its fire by its own number)
+    const t = S[1]!, ci = S[16]! * Dv(7), fi = Dv(8), F = MV[nearest(0)]!, mx = F[0]!, sx = SXv(), feat = city().feature;
     // Soldiers walk in from the ends, stop at their range, and throw; more of them city by city.
     T[0]! -= dt;
     if (T[0]! <= 0) {
       T[0] = Math.max(1.5, 4.2 - t * 0.03 - ci * 0.32) * (0.7 + rnd() * 0.6);
       let alive = 0;
       for (let s = 0; s < NS; s++) if (SO[s * 8]! > 0) alive++;
-      for (let s = 0; s < NS && alive < 3 + ci; s++) {
+      for (let s = 0; s < NS && alive < Dv(6) + ci; s++) {
         const o = s * 8;
         if (SO[o]! > 0) continue;
         const side = mx > 6 ? -1 : mx < -6 ? 1 : rnd() < 0.5 ? -1 : 1;
@@ -965,7 +993,7 @@ export function createRun(seed = 20261116) {
       else if (d < SO[o + 6]! - 1.2) (SO[o + 1] = SO[o + 1]! - SO[o + 3]! * 2.2 * dt), (SO[o + 4] = 0), (SO[o + 7] = SO[o + 7]! + dt * 9);
       else SO[o + 4] = 1;
       SO[o + 5]! -= dt;
-      if (SO[o + 5]! <= 0 && d < 11) (SO[o + 5] = Math.max(1.4, 2.4 - ci * 0.12) + rnd() * 1.4), pebble(SO[o + 1]! + SO[o + 3]! * 0.2, 0.55, SO[o + 2]!, 8, 0);
+      if (SO[o + 5]! <= 0 && d < 11) (SO[o + 5] = (Math.max(1.4, 2.4 - ci * 0.12) + rnd() * 1.4) * fi), pebble(SO[o + 1]! + SO[o + 3]! * 0.2, 0.55, SO[o + 2]!, 8, 0);
     }
     // Snipers in the windows.
     for (let b = 0; b < nb(); b++) {
@@ -976,7 +1004,7 @@ export function createRun(seed = 20261116) {
         if (occ[i] !== 2) continue;
         ocT[i] = ocT[i]! - dt;
         if (ocT[i]! <= 0) {
-          ocT[i] = 2.6 + rnd() * 1.6;
+          ocT[i] = (2.6 + rnd() * 1.6) * fi;
           const x = x0 + c + 0.5;
           if (Math.abs(x - mx) < 9) pebble(x, yOff(b) + fl + 0.5, 0.2, 7, 0);
         }
@@ -991,7 +1019,7 @@ export function createRun(seed = 20261116) {
         const w = BLD[b * 4 + 1]!, f = BLD[b * 4 + 2]!, i = C0[b]! + Math.floor(rnd() * f) * w + Math.floor(rnd() * w);
         if (cell[i] !== HOLE && !occ[i] && !LIVE[i]) {
           const r = rnd();
-          occ[i] = r < 0.2 + ci * 0.015 ? 2 : r < 0.3 ? 3 : 1;
+          occ[i] = r < (0.2 + ci * 0.015) * Dv(6) / 3 ? 2 : r < 0.3 ? 3 : 1;
           ocT[i] = 2 + rnd() * 2;
         }
       }
@@ -1010,7 +1038,7 @@ export function createRun(seed = 20261116) {
       TK[6] = Math.max(0, TK[6]! - dt * 3);
       TK[10] = Math.max(0, TK[10]! - dt);
       TK[3]! -= dt;
-      if (TK[3]! <= 0 && Math.abs(dx) < 12) (TK[3] = Math.max(1.8, 3.2 - ci * 0.2) + rnd()), (TK[6] = 1), pebble(TK[1]! + TK[2]! * 1.7, 1.05, TK[7]!, 9, 2);
+      if (TK[3]! <= 0 && Math.abs(dx) < 12) (TK[3] = (Math.max(1.8, 3.2 - ci * 0.2) + rnd()) * fi), (TK[6] = 1), pebble(TK[1]! + TK[2]! * 1.7, 1.05, TK[7]!, 9, 2);
     } else if (TK[0] === 2) {
       TK[5]! -= dt;
       if (TK[5]! <= 0) TK[0] = 0;
@@ -1040,7 +1068,7 @@ export function createRun(seed = 20261116) {
           if (HE[o + 7]! <= 0) HE[o + 7] = 3;
           pebble(HE[o + 1]!, HE[o + 2]! - 0.4, HE[o + 3]!, 10, 1);
           HE[o + 7]!--;
-          HE[o + 6] = HE[o + 7]! > 0 ? 0.14 : Math.max(1.4, 2.6 - ci * 0.15) + rnd();
+          HE[o + 6] = HE[o + 7]! > 0 ? 0.14 : (Math.max(1.4, 2.6 - ci * 0.15) + rnd()) * fi;
         }
       } else if (he === 2) {
         HE[o + 5] = HE[o + 5]! - G * 0.55 * dt;
@@ -1065,7 +1093,7 @@ export function createRun(seed = 20261116) {
         if (dx * dx + dy * dy * 0.45 + dz * dz * 0.4 < 1.35) {
           PB[o] = 0;
           setCur(m);
-          hurt(PB[o + 7] === 2 ? 6 : 3);
+          hurt((PB[o + 7] === 2 ? 6 : 3) * (O[28] === AI ? 1 : Dv(9)));
           break;
         }
       }
@@ -1189,8 +1217,10 @@ export function createRun(seed = 20261116) {
       if (O[24] === WAIT && (O[30] = O[30]! - dt) <= 0) O[24] = IN;
       if (O[24] !== IN) continue;
       const who = O[28]!;
-      if (who === AI) autopilot(IA, k);
+      if (who === AI) autopilot(IA, k), S[28] || pace(k);
       else for (let j = 0; j < NI; j++) IA[j] = I[who * NI + j]!;
+      // (the same body for everyone: a stick is −1..1, whoever moves it)
+      IA[0] = Math.max(-1, Math.min(1, IA[0]!)); IA[1] = Math.max(-1, Math.min(1, IA[1]!));
       setCur(k);
       // v12: stunned (a pounce) it can't move; an AI's pounce crouches, then jumps at where its target was.
       M[53] = Math.max(0, M[53]! - dt);
@@ -1199,7 +1229,9 @@ export function createRun(seed = 20261116) {
         M[19] = Math.max(M[19]!, 0.7);
         if ((M[55] = Math.max(0, M[55]! - dt)) <= 0 && M[5] === WALK && M[57]! > 0) {
           const dx = MV[M[57]! - 1]![0]! - M[0]!;
-          M[5] = AIR; M[4] = 11.5; M[3] = Math.max(-6, Math.min(6, dx / 0.5)); M[6] = dx >= 0 ? 1 : -1;
+          // (a player's own jump: 11 up, the walk's 5.2 along at most, at the level's speed)
+          const vx = 5.2 * Dv(0);
+          M[5] = AIR; M[4] = 11; M[3] = Math.max(-vx, Math.min(vx, dx / 0.5)); M[6] = dx >= 0 ? 1 : -1;
           emit(E_JUMP, 0);
         }
       } else if (M[5] !== AIR) M[57] = 0;
@@ -1327,28 +1359,48 @@ export function createRun(seed = 20261116) {
     }
     // v12: a pounce under way: the crouch holds still (the tell), the jump keeps its line.
     if (M[55]! > 0 || M[53]! > 0) return setCur(0);
-    if (md === AIR && M[57]! > 0) return void ((I[0] = M[3]! / 5), setCur(0));
+    if (md === AIR && M[57]! > 0) return void ((I[0] = Math.max(-1, Math.min(1, M[3]! / (5 * Dv(0))))), setCur(0));
     A[5] = Math.max(0, A[5]! - 1 / 60);
     A[6] = Math.max(0, A[6]! - 1 / 60);
     A[7] = Math.max(0, A[7]! - 1 / 60);
+    // (only a monster the run drives: online a screen's own seat on the autopilot must leave the run's state alone)
+    const ai = rival && M[28] === AI, cd = ai ? Dv(2) : 1;
+    // v15, a human's pacing: it notices a player only after he has been near a moment (its reaction), rests a beat
+    // after each move and taunts now and then (stands, or hangs, doing nothing).
+    let ready = true;
+    if (ai) {
+      A[9] = Math.max(0, A[9]! - 1 / 60);
+      A[10] = Math.max(0, A[10]! - 1 / 60);
+      A[13] = A[13]! - 1 / 60;
+      let near = false;
+      for (let j = 0; j < NM; j++) {
+        const O = MV[j]!;
+        if (O[28] !== AI && O[24] === IN && O[5] !== KO && Math.abs(O[0]! - x) < 5 && Math.abs(O[1]! - M[1]!) < 4.5) near = true;
+      }
+      A[8] = near ? A[8]! + 1 / 60 : 0;
+      ready = A[8]! >= Dv(1);
+      if (A[9]! > 0) return setCur(0);
+      if (A[13]! <= 0 && (md === WALK || md === CLIMB) && M[8]! <= 0) return void ((A[13] = 4 + rnd() * 5), (A[9] = AI_TAUNT * (0.6 + rnd() * 0.8)), setCur(0));
+    }
+    /** v15: does it go for player j now (its level's odds), else it leaves him be for a while (cool, s)? */
+    const go = (j: number, cool: number) => !ai || MV[j]![28] === AI || rnd() < Dv(3) || ((A[cool] = 1.2 * cd), false);
     // v12: rivals fight back with the same moves, at an AI's rate: a power punch at a player in reach (its wind-up
     // is the tell: step or jump clear), or on the street a pounce at one a little way off (a crouch first).
-    // (only a monster the run drives: online a screen's own seat on the autopilot must leave the run's state alone)
-    if (rival && M[28] === AI && M[8]! <= 0)
+    if (ai && ready && M[8]! <= 0)
       for (let j = 0; j < NM; j++) {
         const O = MV[j]!;
         if (j === k || O[28] === AI || O[24] !== IN || O[5] === KO) continue;
-        if (A[6]! <= 0 && powerReach(M, j)) return void ((A[6] = AI_POWER), (I[2] = 1), (I[5] = T_RIVAL + j), setCur(0));
+        if (A[6]! <= 0 && powerReach(M, j)) return void (go(j, 6) && ((A[6] = AI_POWER * cd), (A[9] = AI_REST), (I[2] = 1), (I[5] = T_RIVAL + j)), setCur(0));
         const d = Math.abs(O[0]! - x);
-        if (A[7]! <= 0 && md === WALK && O[5] === WALK && d > 1.6 && d < 3.2) return void ((A[7] = AI_POWER * 1.6), (M[55] = POUNCE_TELL), (M[57] = j + 1), (M[6] = O[0]! > x ? 1 : -1), emit(E_TELL, j), setCur(0));
+        if (A[7]! <= 0 && md === WALK && O[5] === WALK && d > 1.6 && d < 3.2) return void (go(j, 7) && ((A[7] = AI_POWER * 1.6 * cd), (M[55] = POUNCE_TELL), (M[57] = j + 1), (M[6] = O[0]! > x ? 1 : -1), emit(E_TELL, j)), setCur(0));
       }
-    // A rival bonks whoever is in reach, now and then.
+    // A rival bonks whoever is in reach, now and then (a player once it has noticed him).
     if (rival && A[5]! <= 0 && M[8]! <= 0) {
       fist();
       for (let j = 0; j < NM; j++) {
         const O = MV[j]!;
-        if (j === k || O[24] !== IN || O[5] === KO) continue;
-        if (Math.abs(O[0]! - x) < 2.4 && M[17]! > O[1]! + 0.3 && M[17]! < O[1]! + 3.6) return void ((A[5] = 1.4), (I[0] = O[0]! > x ? 0.3 : -0.3), (I[2] = 1), setCur(0));
+        if (j === k || O[24] !== IN || O[5] === KO || (ai && O[28] !== AI && !ready)) continue;
+        if (Math.abs(O[0]! - x) < 2.4 && M[17]! > O[1]! + 0.3 && M[17]! < O[1]! + 3.6) return void (go(j, 5) && ((A[5] = 1.4 * cd), ai && (A[9] = AI_REST), (I[0] = O[0]! > x ? 0.3 : -0.3), (I[2] = 1)), setCur(0));
       }
     }
     A[2] = Math.max(0, A[2]! - 1 / 60);
@@ -1393,7 +1445,8 @@ export function createRun(seed = 20261116) {
       for (let q = 0; q < NR && B[b * 6] === STAND; q++) {
         const c = AI_ORDER[q]!, i = reachCell(M, c);
         if (i < 0 || cell[i] === HOLE || LIVE[i]) continue;
-        if (M[33] === 0) (I[2] = 1), (I[5] = T_CELL + c);
+        // (v15: a rival the run drives keeps its level's gap between window punches; a player's own is PUNCH_CD)
+        if (M[33] === 0 && !(ai && A[10]! > 0)) (I[2] = 1), (I[5] = T_CELL + c), ai && (A[10] = Dv(4));
         return setCur(0);
       }
       if (B[b * 6] === STAND && M[1]! < top(b) - CLIMB_TOP - 0.05 && A[3]! < 1) return void ((I[1] = 1), setCur(0));
@@ -1428,16 +1481,31 @@ export function createRun(seed = 20261116) {
     } else if (md === AIR) I[0] = -s;
     setCur(0);
   }
+  /** v15: a rival's stick after its autopilot: never an instant turn round on the street (a beat first), and at the
+   *  level's speed (./DIFF: never above a player's own). */
+  function pace(k: number) {
+    const A = AV[k]!, O = MV[k]!;
+    A[12] = Math.max(0, A[12]! - 1 / 60);
+    if (O[5] === WALK && IA[0]) {
+      const d = IA[0]! > 0 ? 1 : -1;
+      if (A[11] && d !== A[11]) A[12] = AI_TURN;
+      A[11] = d;
+    }
+    if (A[12]! > 0) IA[0] = 0;
+    IA[0] = IA[0]! * Dv(0);
+    IA[1] = IA[1]! * Dv(0);
+  }
   /** The autopilot for a player's own monster outside the run's step (online: the screen's own seat on
    *  the autopilot): it reads the run, but its own timers live in `own` (10 numbers), so the run's
    *  bytes are left exactly as they were (every screen must step the same state). */
   function autopilotOwn(I: Float64Array, k: number, own: Float64Array) {
+    // (every one of its AW numbers put back, not only the 8 it keeps in `own`: v15's pacing ones too)
     const a = AV[k]!, O = MV[k]!;
-    for (let j = 0; j < 8; j++) (SAVE[j] = a[j]!), (a[j] = own[j]!);
-    SAVE[8] = O[16]!; SAVE[9] = O[17]!;
+    for (let j = 0; j < AW; j++) (SAVE[j] = a[j]!), j < 8 && (a[j] = own[j]!);
+    SAVE[AW] = O[16]!; SAVE[AW + 1] = O[17]!;
     autopilot(I, k);
-    for (let j = 0; j < 8; j++) (own[j] = a[j]!), (a[j] = SAVE[j]!);
-    O[16] = SAVE[8]!; O[17] = SAVE[9]!;
+    for (let j = 0; j < AW; j++) j < 8 && (own[j] = a[j]!), (a[j] = SAVE[j]!);
+    O[16] = SAVE[AW]!; O[17] = SAVE[AW + 1]!;
   }
   /** The floor a punch from side s of building b should go for (lowest first), skipping floors whose next window in is live. */
   function goodRow(b: number, s: number) {

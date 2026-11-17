@@ -8,7 +8,7 @@
 import { FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, LOOK0, RIVALS, type Look } from "./monster.ts";
 import { CITIES, NCITY } from "./cities.ts";
 
-export const VERSION = 3;
+export const VERSION = 4;
 export interface Profile {
   v: number;
   look: Look;
@@ -19,6 +19,8 @@ export interface Profile {
   best: number;
   /** AI rivals on (1) or off (0). */
   rivals: number;
+  /** v15: the level: 0 EASY, 1 MEDIUM, 2 HARD (../round.ts LEVELS). */
+  level: number;
   /** The monster you play: 0 the ape, 1 SHARDCLAW, 2 GLOOPMAW, 3 VOLTWING (owned as "mon:k"). */
   mon: number;
   /** Each rival's dress when you play it, [colour, trim] × 3: −1 its own, else a FURS / TRIMS index you own. */
@@ -53,14 +55,16 @@ export function partName(tag: string) {
 /** The city that unlocks a part (−1: owned from the start). */
 export const unlockedBy = (tag: string) => UNLOCKS.findIndex((u) => u.includes(tag));
 
-export const fresh = (): Profile => ({ v: VERSION, look: { ...LOOK0 }, owned: BASE.slice(), cleared: [], best: 0, rivals: 1, mon: 0, rlook: RLOOK0.slice(), stats: { runs: 0, buildings: 0, snacks: 0, helis: 0 } });
+export const fresh = (): Profile => ({ v: VERSION, look: { ...LOOK0 }, owned: BASE.slice(), cleared: [], best: 0, rivals: 1, level: 1, mon: 0, rlook: RLOOK0.slice(), stats: { runs: 0, buildings: 0, snacks: 0, helis: 0 } });
 
 export const RLOOK0 = [-1, -1, -1, -1, -1, -1];
 /** Version steps, in order: each takes the save from v to v + 1. 1 → 2: the hair (none yet, a pink to pick).
- *  2 → 3: the playable rivals (only the ape owned: a rival is won by beating it). */
+ *  2 → 3: the playable rivals (only the ape owned: a rival is won by beating it). 3 → 4: the level (MEDIUM, the new
+ *  default: easier than the game before it, which was about HARD). */
 const STEPS: Record<number, (p: any) => any> = {
   1: (p) => ({ ...p, v: 2, look: { ...p.look, hair: 0, hairc: LOOK0.hairc } }),
   2: (p) => ({ ...p, v: 3, mon: 0, rlook: RLOOK0.slice(), owned: (Array.isArray(p.owned) ? p.owned : []).filter((t: unknown) => !/^mon:/.test(String(t))) }),
+  3: (p) => ({ ...p, v: 4, level: 1 }),
 };
 export function migrate(p: any): any {
   let q = { ...p, v: typeof p.v === "number" ? p.v : 1 };
@@ -89,6 +93,7 @@ export function normalize(p: any): Profile {
     cleared: Array.isArray(p.cleared) ? ids.filter((id) => p.cleared.includes(id)) : [],
     best: Math.min(99_999_999, num(p.best)),
     rivals: p.rivals === 0 ? 0 : 1,
+    level: clampI(p.level, 3, 1),
     mon: has("mon", clampI(p.mon, 4, 0)) ? clampI(p.mon, 4, 0) : 0,
     rlook: RLOOK0.map((d, j) => { const v = Array.isArray(p.rlook) ? p.rlook[j] : d, c: Part = j & 1 ? "trim" : "fur", n = j & 1 ? TRIMS.length : FURS.length; return Number.isInteger(v) && v >= 0 && v < n && has(c, v) ? v : -1; }),
     stats: { runs: num(p.stats?.runs), buildings: num(p.stats?.buildings), snacks: num(p.stats?.snacks), helis: num(p.stats?.helis) },

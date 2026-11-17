@@ -19,10 +19,10 @@ const script = (f, p) => {
 };
 const IN = new Float64Array(24);
 /** A run for P seats (seat k drives monster k), from city `ci`. */
-const make = (P, ci = 0, seed = 7) => {
+const make = (P, ci = 0, seed = 7, level = 1) => {
   const r = R.createRun(seed);
   for (let k = 1; k < R.NM; k++) r.MV[k][28] = k < P ? k : R.AI;
-  r.reset(seed, ci, 1);
+  r.reset(seed, ci, 1, 0, level);
   return r;
 };
 const frame = (r, inputs, P) => {
@@ -36,18 +36,19 @@ const frame = (r, inputs, P) => {
   r.clear();
 };
 const same = (a, b) => a.bytes.every((v, i) => Buffer.from(v).equals(Buffer.from(b.bytes[i])));
-function straight(P, frames, ci, input = script) {
-  const r = make(P, ci), inp = new Uint32Array(P);
+function straight(P, frames, ci, input = script, level = 1) {
+  const r = make(P, ci, 7, level), inp = new Uint32Array(P);
   for (let f = 0; f < frames; f++) {
     for (let p = 0; p < P; p++) inp[p] = input(f, p);
     frame(r, inp, P);
   }
   return r;
 }
-function online(P, frames, ci, { latency = 0, jitter = 0, seed = 3, input = script } = {}) {
+function online(P, frames, ci, { latency = 0, jitter = 0, seed = 3, input = script, mode = -1 } = {}) {
   const hub = memory({ peers: P, latency, jitter, seed, cap: 4096 }), off = { hidden: false, offscreen: false, editable: false };
   return Array.from({ length: P }, (_, s) => {
-    const e = createEngine({ seed: 1, pause: off }), sim = make(P, ci);
+    // (v15: each screen makes its run from the host's mode byte, as the game does: its level for everyone)
+    const e = createEngine({ seed: 1, pause: off }), sim = mode < 0 ? make(P, ci) : make(P, unpackMode(mode).first, 7, unpackMode(mode).level);
     const rb = rollback(e, { transport: hub.ends[s], slot: s, players: P, gone: GONE, bytes: sim.bytes, input: (f) => input(f, s), step: (inputs) => frame(sim, inputs, P) });
     rb.hold = frames;
     return { e, sim, rb, hub };
@@ -66,7 +67,7 @@ test("the wire: a seat's numbers survive the trip; the host's pick fits a byte; 
   assert.deepEqual(Array.from(O), [1, -1, 1, 0, 1]);
   decode(encode(new Float64Array(5), 0), 0, O);
   assert.deepEqual(Array.from(O), [0, 0, 0, 0, 0], "a still stick reads 0");
-  for (const m of [[0, 1], [6, 0], [3, 1]]) assert.deepEqual(Object.values(unpackMode(packMode(...m))), m);
+  for (const m of [[0, 1, 1], [6, 0, 0], [3, 1, 2], [6, 1, 2]]) assert.ok(packMode(...m) < 256), assert.deepEqual(Object.values(unpackMode(packMode(...m))), m);
   const look = { fur: 11, trim: 7, pattern: 4, face: 3, gear: 0b10110101, hair: 3, hairc: 6 };
   let acc = 0;
   for (let f = 0; f < LOOK_FRAMES; f++) acc = takeLook(acc, encode(I, 0, lookBits(look, f)), f);
@@ -174,4 +175,33 @@ test("four screens with rollback allocate (almost) nothing", async () => {
   assert.ok(resims.every((n) => n > 5000), `corrections ran: ${resims}`);
   assert.ok(minor <= 12, `young GCs: ${minor}`);
   for (const r of runs) r.e.destroy();
+});
+
+test("v15: online everyone plays the host's level: the mode byte carries it, every screen's run is the same, and it is that level", () => {
+  const P = 2, F = 600;
+  for (const level of [0, 2]) {
+    const runs = online(P, F, 0, { latency: 3, jitter: 2, mode: packMode(0, 1, level) });
+    drive(runs, F);
+    assert.ok(runs.every((r) => r.rb.final === F), "every screen finished");
+    assert.ok(runs.every((r) => r.sim.S[33] === level), `everyone on ${R.LEVELS[level]}`);
+    assert.ok(same(runs[0].sim, runs[1].sim), `${R.LEVELS[level]}: the same run on both screens`);
+    assert.ok(same(runs[0].sim, straight(P, F, 0, script, level)), "and the one the inputs give");
+  }
+  const easy = straight(P, F, 0, script, 0), hard = straight(P, F, 0, script, 2);
+  assert.ok(!same(easy, hard), "a different level is a different run");
+});
+
+test("v15: a screen's own seat on the autopilot (online) never touches the run's state, on any level, the rival seats too", () => {
+  for (let level = 0; level < 3; level++) {
+    const r = make(4, 2, 7, level), own = [0, 1, 2, 3].map(() => new Float64Array(10)), I = new Float64Array(R.NI), IN4 = new Float64Array(24);
+    for (let f = 0; f < 60 * 40; f++) {
+      const before = r.bytes.map((v) => v.slice());
+      for (let s = 0; s < 4; s++) r.autopilotOwn(I, s, own[s]);
+      assert.ok(r.bytes.every((v, i) => Buffer.from(v).equals(Buffer.from(before[i]))), `${R.LEVELS[level]}: frame ${f}: the run untouched`);
+      IN4.fill(0);
+      for (let s = 0; s < 4; s++) r.autopilotOwn(I, s, own[s]), IN4.set(I, s * R.NI);
+      r.step(1 / 60, IN4);
+      r.clear();
+    }
+  }
 });

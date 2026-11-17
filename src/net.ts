@@ -35,9 +35,9 @@ export function decode(bits: number, s: number, IN: Float64Array) {
 /** A seat that left plays these bits from the frame after its last input (every screen the same). */
 export const GONE = B_GONE >>> 0;
 
-/** The host's pick as one byte: the first city (bits 0–2), rivals on (3). */
-export const packMode = (first: number, rivals: number) => (first & 7) | (rivals ? 8 : 0);
-export const unpackMode = (m: number) => ({ first: m & 7, rivals: m & 8 ? 1 : 0 });
+/** The host's pick as one byte: the first city (bits 0–2), rivals on (3), v15: the level (4–5; everyone plays the host's). */
+export const packMode = (first: number, rivals: number, level = 1) => (first & 7) | (rivals ? 8 : 0) | ((level & 3) << 4);
+export const unpackMode = (m: number) => ({ first: m & 7, rivals: m & 8 ? 1 : 0, level: Math.min(2, (m >> 4) & 3) });
 
 /** The ape's look in 26 bits (fur 4, trim 3, pattern 3, face 3, gear 8, hair 2, its colour 3), six a frame over LOOK_FRAMES frames. */
 export const lookBits = (l: Look, f: number) => {

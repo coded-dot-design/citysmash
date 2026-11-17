@@ -13,7 +13,7 @@ const { RUN, WALK, AIR, CLIMB } = R;
 
 const quiet = (ci = 0) => {
   const run = R.createRun(20261116);
-  run.reset(20261116, ci, 0);
+  run.reset(20261116, ci, 0, 0, 2); // (HARD: every rule at its plain number)
   run.S[0] = RUN;
   for (let h = 0; h < R.NH; h++) run.HE[h * 12 + 8] = 1e9;
   run.TK[4] = 1e9; run.FE[3] = 1e9; run.FE[8] = 1e9; run.FE[10] = 1e9;

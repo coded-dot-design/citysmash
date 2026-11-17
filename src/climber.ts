@@ -184,7 +184,8 @@ export function createClimber(bk: Block, h: ClimberHooks) {
     if (M[0]! < -SX - 1) M[0] = -SX - 1;
     if (M[0]! > SX + 1) M[0] = SX + 1;
     // A rival comes in from the table's end: it walks onto the street.
-    if (M[5] === WALK && Math.abs(M[0]!) > SX - 0.5 && !hero) M[0] = M[0]! - (M[0]! > 0 ? 1 : -1) * dt * 3;
+    // (v15: off the table only, and never faster in than the walk itself: in all at 3 a second at most)
+    if (M[5] === WALK && Math.abs(M[0]!) > SX && !hero) M[0] = M[0]! - (M[0]! > 0 ? 1 : -1) * dt * Math.max(0, 3 + M[3]! * (M[0]! > 0 ? 1 : -1));
     if (M[5] === WALK && hero) M[0] = Math.max(-SX, Math.min(SX, M[0]!));
   }
   return { step, wallAt, hang, dropOff, leap };

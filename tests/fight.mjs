@@ -10,7 +10,8 @@ import { chromium } from "playwright";
 import { serve, launchOptions } from "./serve.mjs";
 
 const fixture = readFileSync("tests/fixtures/page.html", "utf8");
-const page = fixture.replace("</body>", `<script type="module">import { createCitySmash } from "/dist/citysmash.mjs"; window.game = createCitySmash({ host: document.getElementById("board"), seed: 3, store: { get: () => null, set() {} } });</script></body>`);
+const page = fixture.replace("</body>", `<script type="module">import { createCitySmash } from "/dist/citysmash.mjs"; window.game = createCitySmash({ host: document.getElementById("board"), seed: 3, store: { get: () => '{"v":4,"level":2}', set() {} } });</script></body>`);
+// (v15: on HARD, where a player's toughness is 1: the rules' plain numbers)
 const server = await serve(".", { "/": page });
 const browser = await chromium.launch(launchOptions());
 const VIDEO = process.env.VIDEO;

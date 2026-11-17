@@ -23,7 +23,7 @@ import {
   E_START, E_HOLE, E_SHAKE, E_FLOOR, E_FLAT, E_HELI, E_HELI_CRASH, E_NOM, E_HURT, E_FLING, E_DROP, E_KO, E_END, E_STOMP, E_JUMP, E_LAND, E_CLIMB,
   E_SHOCK, E_TANK, E_BONK, E_BURN, E_JOIN, E_CHIP_, E_CRACK_, E_ARMOUR, E_TRAIN, E_BELLS, E_RAM, E_TRUCK, E_SURGE, E_CITY, E_CLEAR, E_PUNCH,
   E_POWER, E_KNOCKOFF, E_POUNCE, E_COMBO_HIT, E_TELL, T_RIVAL, T_RIVAL_END, DUMMY, T_TANK, TANK_HITS, TANK_ARMOUR, T_FOE, T_TRUCK, T_GROUND_END,
-  NI, NR, NG, P_ALL, E_LEAP, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
+  NI, NR, NG, P_ALL, E_LEAP, LEVEL0, LEVELS, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
@@ -96,6 +96,8 @@ export interface SceneOptions {
   first?: number;
   /** AI rivals come in (1) or not (0). */
   rivals?: number;
+  /** v15: the level, 0 EASY, 1 MEDIUM (the default), 2 HARD (./round.ts LEVELS). */
+  level?: number;
   /** Who drives each monster at the start: a seat 0..3 or AI (seat 0 drives monster 0). */
   drivers?: number[];
   /** Which monster each slot is (0 the ape, 1 SHARDCLAW, 2 GLOOPMAW, 3 VOLTWING): slot 0 is this screen's player. */
@@ -127,7 +129,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   const run: Run = createRun(so.seed ?? 20261116), S = run.S, MV = run.MV;
   const drivers = so.drivers ?? [0, AI, AI, AI];
   for (let k = 0; k < NM; k++) (run.MV[k]![28] = k === HERO ? 0 : drivers[k] ?? AI), (run.MV[k]![31] = so.kinds?.[k] ?? k);
-  run.reset(so.seed ?? 20261116, so.first ?? 0, so.rivals ?? 1, so.practice ? 1 : 0);
+  run.reset(so.seed ?? 20261116, so.first ?? 0, so.rivals ?? 1, so.practice ? 1 : 0, so.level ?? LEVEL0);
   if (so.attract) S[27] = 1;
   let built = -1, P: Pal = palette(CITIES[S[16]!]!, light());
   const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1;
@@ -1029,7 +1031,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   const num = (n: number) => n.toLocaleString("en-US");
   function hudWrite() {
     const ci = S[16]!, cty = CITIES[ci]!;
-    if (was[0] !== ci) (was[0] = ci), (cityEl.textContent = cty.name), (todEl.textContent = `${ci + 1}/${NCITY} · ${TOD[cty.tod]}`);
+    // (v15: the level on the city's chip; practice has none)
+    if (was[0] !== ci + S[33]! * 16) (was[0] = ci + S[33]! * 16), (cityEl.textContent = cty.name), (todEl.textContent = `${ci + 1}/${NCITY} · ${TOD[cty.tod]}${S[28] ? "" : " · " + LEVELS[S[33]!]}`);
     if (was[1] !== S[2]) (was[1] = S[2]!), (teamEl.textContent = num(S[2]!));
     const fl = Math.round((S[8]! / Math.max(1, run.bk.L[2]!)) * 100);
     if (was[2] !== fl) (was[2] = fl), (flatEl.textContent = fl + "%");
@@ -1098,7 +1101,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   }
   /** A new run from city `first` (the drivers stay). */
   function restart(first = 0) {
-    run.reset(so.seed ?? 20261116, first, S[22]!, S[28]!);
+    run.reset(so.seed ?? 20261116, first, S[22]!, S[28]!, S[33]!);
     if (so.attract) S[27] = 1;
     endC.hidden = ccard.hidden = true;
     cardUp = -1;

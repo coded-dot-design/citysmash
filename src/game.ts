@@ -15,7 +15,7 @@ import { mountScene, SEAT_C, type Scene } from "./scene.ts";
 import { CITIES, NCITY } from "./cities.ts";
 import { heroName, shade, monName, rivalDress, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS, RIVAL_WHAT, RIVAL_C } from "./monster.ts";
 import { turntable } from "./turntable.ts";
-import { AI, NM, DONE } from "./round.ts";
+import { AI, NM, DONE, LEVELS } from "./round.ts";
 import { load, save, local, fresh, clearCity, startable, endRun, setPart, partName, unlockedBy, exportCode, importCode, beat, setMon, setRival, cast, type Profile, type Store, type Part } from "./profile.ts";
 import { encode, decode, NI, packMode, unpackMode, joinRoom, rollback, lookBits, takeLook, lookOf, GONE, B_GONE, SEATS, LOOK_FRAMES, type Rollback } from "./net.ts";
 
@@ -138,6 +138,8 @@ export function createCitySmash(o: CitySmashOptions = {}) {
   // ---- the cards ----
   const owns = (k: Part, i: number) => profile.owned.includes(`${k}:${i}`);
   const head = () => `<header class="cs-bar"><b class="cs-logo">CITY<i>SMASH</i></b><span class="cs-chip">${esc(monOf())}</span><span class="cs-chip">BEST ${num(profile.best)}</span><span class="cs-chip">CITIES ${profile.cleared.length}/${NCITY}</span></header>`;
+  /** v15: what each level means, under its picker. */
+  const LEVEL_SAY = ["Easy: slower rivals that mostly smash, a small army, snacks heal more.", "Medium: rivals pick fights now and then, the army grows city by city.", "Hard: rivals as quick as you and out for you, the full army."];
   function menuCard() {
     const can = startable(profile);
     const cities = CITIES.map((c, i) => {
@@ -153,7 +155,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     }
     const padRows = pads.slice(0, PADS.n).map((q, i) => `<li class="${q.on ? "cs-in" : ""}" style="--seat:${SEAT_C[i + 1]}"><i>P${i + 2}</i><b>GAMEPAD ${i + 1}</b><button type="button" class="bui-key cs-padmon" data-padmon="${i}" aria-label="Gamepad ${i + 1} plays ${esc(monName(q.mon, profile.look))}: change">${esc(monName(q.mon, profile.look))} ▸</button><small>${q.on ? "READY · stick move · A jump · X punch · B grab · LB/RB aim" : "Press any button to join"}</small></li>`).join("");
     const who = PADS.n ? `<section class="cs-pads" aria-label="Players on this screen"><p class="cs-sub">PLAYERS ON THIS SCREEN</p><p class="cs-explain">Same screen: you, plus one player for each gamepad. Nobody joined on a pad: ${profile.rivals ? "the computer plays that monster." : "it sits out."}</p><ol class="cs-who"><li class="cs-in" style="--seat:${SEAT_C[0]}"><i>P1</i><b>${esc(monOf())}</b><small>READY · Keys: WASD move · Space jump · J punch · K grab · Q/E aim · or mouse/tap</small></li>${padRows}</ol></section>` : "";
-    return `<section class="cs-screen cs-menu" aria-label="CitySmash">${head()}<div class="cs-mbody"><div class="cs-story"><h2>Climb it. Smash it. Eat the snacks.</h2><p>You are a giant cyber ape. Jump at a building's side and hang on: your inside arm grips, your outside arm smashes the windows by your climb. Three hits a window. Enough holes and the whole thing pancakes. Seven cities, day into night. Beat a rival monster and it is yours to play.</p><div class="cs-actions"><button type="button" class="bui-key bui-go cs-big" data-play>▶ SMASH ${esc(CITIES[start]!.name)}</button><button type="button" class="bui-key" data-practice>PRACTICE</button><button type="button" class="bui-key" data-go="garage">GARAGE</button><button type="button" class="bui-key cs-friends" data-go="online"><b>PLAY WITH FRIENDS</b><small>ONLINE · EACH ON THEIR OWN DEVICE</small></button></div><p class="cs-sizes"><button type="button" class="bui-key cs-riv" data-rivals aria-pressed="${!!profile.rivals}">CPU RIVALS: ${profile.rivals ? "ON" : "OFF"}</button></p><p class="cs-explain">Computer rivals: the monsters nobody picked join as AI.</p>${CONTROLS}${who}${note ? `<p class="cs-note">${esc(note)}</p>` : ""}</div><ol class="cs-cities" aria-label="Start from">${cities}</ol></div></section>`;
+    return `<section class="cs-screen cs-menu" aria-label="CitySmash">${head()}<div class="cs-mbody"><div class="cs-story"><h2>Climb it. Smash it. Eat the snacks.</h2><p>You are a giant cyber ape. Jump at a building's side and hang on: your inside arm grips, your outside arm smashes the windows by your climb. Three hits a window. Enough holes and the whole thing pancakes. Seven cities, day into night. Beat a rival monster and it is yours to play.</p><div class="cs-actions"><button type="button" class="bui-key bui-go cs-big" data-play>▶ SMASH ${esc(CITIES[start]!.name)}</button><button type="button" class="bui-key" data-practice>PRACTICE</button><button type="button" class="bui-key" data-go="garage">GARAGE</button><button type="button" class="bui-key cs-friends" data-go="online"><b>PLAY WITH FRIENDS</b><small>ONLINE · EACH ON THEIR OWN DEVICE</small></button></div><p class="cs-sizes"><button type="button" class="bui-key cs-riv" data-rivals aria-pressed="${!!profile.rivals}">CPU RIVALS: ${profile.rivals ? "ON" : "OFF"}</button></p><p class="cs-explain">Computer rivals: the monsters nobody picked join as AI.</p><p class="cs-sizes cs-levels" role="group" aria-label="Difficulty">${LEVELS.map((l, i) => `<button type="button" class="bui-key" data-level="${i}" aria-pressed="${profile.level === i}">${l}</button>`).join("")}</p><p class="cs-explain">${LEVEL_SAY[profile.level]}</p>${CONTROLS}${who}${note ? `<p class="cs-note">${esc(note)}</p>` : ""}</div><ol class="cs-cities" aria-label="Start from">${cities}</ol></div></section>`;
   }
   function garageCard() {
     const lk = profile.look, mon = profile.mon;
@@ -228,7 +230,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     for (let s = 1; s < NM; s++) if (kinds[s]! < 0) kinds[s] = cast(profile.mon, kinds.filter((k) => k >= 0)).find((k) => !kinds.includes(k))!;
     const mon = o.attract ? 0 : profile.mon;
     scene = mountScene(sceneEl, {
-      look: profile.look, seed: (o.seed ?? 1) * 7919 + profile.stats.runs * 31 + 20261116, first: from, rivals: profile.rivals, drivers, theme: pageTheme, sound: o.sound, attract: o.attract, practice,
+      look: profile.look, seed: (o.seed ?? 1) * 7919 + profile.stats.runs * 31 + 20261116, first: from, rivals: profile.rivals, level: profile.level, drivers, theme: pageTheme, sound: o.sound, attract: o.attract, practice,
       kinds: o.attract ? undefined : kinds, dress: mon ? rivalDress(mon, profile.rlook) : null,
       beat: (k) => {
         // Beaten in a one-player run: that rival is yours to play.
@@ -348,7 +350,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     $o(".cs-wait-say").textContent = host ? "Opening a room…" : `Joining room ${net.room}…`;
     $o(".cs-gonow").hidden = true;
     net.abort = new AbortController();
-    const signal = net.abort.signal, mine = packMode(start, profile.rivals);
+    const signal = net.abort.signal, mine = packMode(start, profile.rivals, profile.level);
     for (let tries = 0; ; tries++) {
       if (!cards.querySelector(".cs-t-room")) return;
       $o(".cs-t-room").textContent = "" + net.room;
@@ -398,7 +400,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     paint();
     const drivers = [0, AI, AI, AI];
     for (let k = 1; k < net.players; k++) drivers[k] = k;
-    scene = mountScene(sceneEl, { look: net.seat === 0 ? profile.look : { fur: 0, trim: 0, pattern: 0, face: 0, gear: 0, hair: 0, hairc: 0 }, seed: s.seed >>> 0, first: m.first, rivals: m.rivals, drivers, theme: pageTheme, sound: o.sound, net: { seat: net.seat }, on: onScene });
+    scene = mountScene(sceneEl, { look: net.seat === 0 ? profile.look : { fur: 0, trim: 0, pattern: 0, face: 0, gear: 0, hair: 0, hairc: 0 }, seed: s.seed >>> 0, first: m.first, rivals: m.rivals, level: m.level, drivers, theme: pageTheme, sound: o.sound, net: { seat: net.seat }, on: onScene });
     const sc = scene, me = net.seat;
     net.link = rollback(sc.engine, {
       transport: s.transport, slot: me, players: net.players, gone: GONE, bytes: sc.run.bytes,
@@ -460,6 +462,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     if (d.go) return (note = ""), show(d.go as Screen);
     if (d.start) return (start = +d.start), paint();
     if ("rivals" in d) return (profile = { ...profile, rivals: profile.rivals ? 0 : 1 }), keep(), paint();
+    if (d.level) return (profile = { ...profile, level: +d.level }), keep(), paint(), void (cards.querySelector(`[data-level="${d.level}"]`) as HTMLElement | null)?.focus();
     if (d.tab) return (tab = d.tab as Tab), (note = ""), paint();
     if (d.part) {
       const k = d.part as Part, i = +d.i!;

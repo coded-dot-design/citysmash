@@ -66,6 +66,8 @@ try {
         };
         for (const b of [...new Set([1, nb - 2, ...tanks])]) for (const s of [-1, 1]) {
           r.cell.fill(2); r.B.fill(0); r.occ.fill(0); r.HIT.fill(0); r.SO.fill(0); r.CH.fill(0);
+          // (v15: the army held off too: a shot or a shock in the 90 steps flinches him, a pose of its own)
+          r.PB.fill(0); r.HE[0] = r.HE[12] = 0; r.HE[8] = r.HE[20] = 1e9; r.TK[0] = 0; r.TK[4] = 1e9; r.FE[8] = 1e9; r.FE[9] = 0;
           const fl = Math.min(2, r.BLD[b * 4 + 2] - 2);
           const hang = () => { M[5] = 2; M[12] = b; M[22] = s; M[0] = r.wallX(b, s); M[2] = -0.55; M[6] = -s; M[1] = fl + 0.5 - 1.9; M[3] = 0; M[4] = 0; M[7] = 100; M[8] = 0; M[33] = 0; M[20] = 0; M[34] = 0; M[9] = 0; M[10] = 0; M[11] = 0; M[15] = 0; M[19] = 0; M[23] = 0; };
           hang();

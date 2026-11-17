@@ -32,7 +32,7 @@ function play(run, n, input) {
 /** A run in city ci with no army, nobody at the windows and no rivals: the rules alone. */
 const quiet = (ci = 0) => {
   const run = R.createRun(20261116);
-  run.reset(20261116, ci, 0);
+  run.reset(20261116, ci, 0, 0, 2); // (HARD: every rule at its plain number)
   run.S[0] = RUN;
   for (let h = 0; h < R.NH; h++) run.HE[h * 12 + 8] = 1e9;
   run.TK[4] = 1e9; run.FE[3] = 1e9; run.FE[8] = 1e9; run.FE[10] = 1e9;
@@ -510,7 +510,7 @@ test("each city's feature: the gunboat on the water, the train bowls you over (a
 
 test("city after city: flat → the card → the next city (score carried, the KO'd back, harder), to the end of the run", () => {
   const run = R.createRun(9);
-  run.reset(9, 0, 1);
+  run.reset(9, 0, 1, 0, 0); // (EASY: the autopilot keeps going city after city)
   const ev = play(run, 60 * 60 * 6, "auto"), cities = ev.filter((e) => e[0] === R.E_CITY).map((e) => e[1]);
   const clears = ev.filter((e) => e[0] === R.E_CLEAR).map((e) => e[1]);
   assert.ok(clears.length >= 3, `the autopilot flattens cities: ${clears}`);

@@ -26,7 +26,7 @@ function play(run, n, input) {
 /** A quiet run (no army, nobody at the windows) with the rival SHARDCLAW (monster 1) on seat two (so it does only what the test says). */
 function arena(ci = 0) {
   const run = R.createRun(20261116);
-  run.reset(20261116, ci, 0);
+  run.reset(20261116, ci, 0, 0, 2); // (HARD: every rule at its plain number)
   run.S[0] = RUN;
   for (let h = 0; h < R.NH; h++) run.HE[h * 12 + 8] = 1e9;
   run.TK[4] = 1e9; run.FE[3] = 1e9; run.FE[8] = 1e9; run.FE[10] = 1e9;
@@ -136,7 +136,8 @@ test("v12: the AI rivals fight back: a power punch at a player in reach with the
   const run2 = arena(), M2 = run2.MV[0], O2 = run2.MV[1];
   run2.join(1, AI); O2[24] = IN;
   street(M2, x, 1); street(O2, x + 2.8, -1);
-  run2.AS[8 + 6] = 1e9; // (power punch off: the pounce alone)
+  run2.AS[R.AW + 6] = 1e9; // (power punch off: the pounce alone)
+  run2.AS[R.AW + 8] = 1; // (v15: it has noticed him already: its reaction is checked on its own)
   const evp = play(run2, 120);
   const tell = has(evp, R.E_TELL)[0], pn = has(evp, R.E_POUNCE)[0];
   assert.ok(tell, "the tell");
@@ -146,7 +147,8 @@ test("v12: the AI rivals fight back: a power punch at a player in reach with the
   const run3 = arena(), M3 = run3.MV[0], O3 = run3.MV[1];
   run3.join(1, AI); O3[24] = IN;
   street(M3, x, 1); street(O3, x + 2.8, -1);
-  run3.AS[8 + 6] = 1e9;
+  run3.AS[R.AW + 6] = 1e9;
+  run3.AS[R.AW + 8] = 1;
   let told = -1;
   const evd = play(run3, 120, (I, f) => { if (told < 0 && O3[55] > 0) told = f; if (told >= 0) I[0] = -1; });
   assert.ok(told >= 0, "it crouched");

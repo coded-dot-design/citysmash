@@ -165,3 +165,21 @@ test("v10: the cast: yours in slot 0, the ape first among the AI when you play a
   assert.deepEqual(P.cast(1), [1, 0, 2, 3]);
   assert.deepEqual(P.cast(3), [3, 0, 1, 2]);
 });
+
+test("v15: the level is saved (MEDIUM by default), repaired when out of range, and an old save (v3) migrates to MEDIUM; the export code keeps it", () => {
+  const f = P.fresh();
+  assert.equal(P.VERSION, 4);
+  assert.equal(f.level, 1, "MEDIUM by default");
+  const s = mem();
+  for (const level of [0, 1, 2]) {
+    P.save({ ...f, level }, s);
+    assert.equal(P.load(s).profile.level, level, `level ${level} round-trips`);
+  }
+  for (const bad of [3, -1, 1.5, "2", null]) assert.equal(P.normalize({ ...f, level: bad }).level, 1, `${bad} → MEDIUM`);
+  const v3 = { v: 3, look: { ...Mo.LOOK0 }, owned: P.BASE.slice(), cleared: ["port-lumen"], best: 9, rivals: 1, mon: 0, rlook: P.RLOOK0.slice(), stats: { runs: 2, buildings: 1, snacks: 0, helis: 0 } };
+  s.set(P.KEY, JSON.stringify(v3));
+  const got = P.load(s).profile;
+  assert.deepEqual([got.v, got.level, got.cleared, got.best], [4, 1, ["port-lumen"], 9], "v3 → v4: MEDIUM, the rest kept");
+  const hard = { ...f, level: 2 };
+  assert.equal(P.importCode(P.exportCode(hard))?.level, 2, "the export code carries it");
+});

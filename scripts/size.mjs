@@ -16,7 +16,10 @@ import { readdirSync, readFileSync } from "node:fs";
 // Raised to 92,000 for v14 (keyboard play: the aim on a wall and its keys, the pads' LB/RB, the leap across the gap and
 // the double-tap let-go, their pops, the controls card, two practice steps): citysmash.mjs 89,662 → 91,117 B,
 // citysmash.js 89,888 → 91,354 B (CHANGELOG).
-const BUDGET = 92_000;
+// Raised to 94,000 for v15 (EASY / MEDIUM / HARD: the level's table, the rivals' reaction, rests, taunts and turn beat,
+// the menu's picker and the HUD chip, the profile's level and its migration, the level in the room's mode):
+// citysmash.mjs 91,117 → 92,078 B, citysmash.js 91,354 → 92,304 B (CHANGELOG).
+const BUDGET = 94_000;
 let failed = false;
 for (const file of readdirSync("dist").filter((f) => /\.m?js$/.test(f)).sort().map((f) => `dist/${f}`)) {
   const gz = gzipSync(readFileSync(file)).length, ok = gz <= BUDGET;
