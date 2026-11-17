@@ -19,10 +19,15 @@ const until = (p, fn, arg, what, timeout = 20000) => p.waitForFunction(fn, arg, 
 const sr = "document.querySelector('[data-fizlet-host]').shadowRoot";
 const pace = (p, ms) => (VIDEO ? p.waitForTimeout(ms) : Promise.resolve());
 const fb = (p) => p.evaluate(() => game.scene.feedback);
-/** Hang monster k on building b's side s with its hand at floor fl; the army away, no live windows, nobody home. */
+/** Hang monster k on building b's side s with its hand at floor fl; the army away, no live windows, nobody home,
+ *  and the CPU rivals kept waiting off the table. (They come in on the city's clock, the first 1.5 s in, and the
+ *  engine sleeps while nothing moves, so here about 0.4 s of game time was left at the K press: on a slower machine
+ *  more of the clock runs between the keys, a rival walks in and fights for the same wall, punching the aimed
+ *  window to a hole, eating whoever is at it or knocking him off. Not what this checks.) */
 const hang = (p, b, s, fl, k = 0) => p.evaluate(([b, s, fl, k]) => {
   const r = game.scene.run, M = r.MV[k];
   r.SO.fill(0); r.HE[8] = r.HE[20] = 1e9; r.TK[4] = 1e9; r.TK[0] = 0; r.LIVE.fill(0); r.occ.fill(0);
+  for (const O of r.MV) if (O !== M && O[28] === 9) (O[24] = O[24] === 1 ? 2 : O[24]), (O[30] = 1e9), (O[0] = 18.4 * Math.sign(O[0] || 1));
   M[5] = 2; M[12] = b; M[22] = s; M[0] = r.wallX(b, s); M[2] = -0.55; M[6] = -s; M[1] = fl + 0.5 - 1.9; M[33] = 0; M[7] = 100; M[15] = 0;
 }, [b, s, fl, k]);
 const reach = (p, c, k = 0) => p.evaluate(([c, k]) => game.scene.run.reachCell(game.scene.run.MV[k], c), [c, k]);
@@ -101,10 +106,23 @@ try {
   await until(p, () => { const M = game.scene.run.M; return M[5] === 2 && M[12] === 0 && M[22] === 1; }, null, "Space leaps to the next building");
   assert.equal((await fb(p)).leaps[3], l0[3] + 1, "LEAP! (caught the wall across)");
   await pace(p, 900);
-  // Space twice quickly: let go, down to the street.
-  await p.keyboard.press("Space");
-  await p.waitForTimeout(90);
-  await p.keyboard.press("Space");
+  // Space twice quickly: let go, down to the street. (The second press must land inside the leap's double-tap
+  // window, LEAP_TAP = 0.3 s of game time. A fixed real-time pause between two keyboard round trips overran it on a
+  // loaded machine, and a second key sent before the first one's keyup lands is no new press. So both presses go
+  // from the page, through the same key handler: the second on the first frame the leap is under way, at most a
+  // frame, 4 steps, of game time later. The real Space key's leap is checked just above.)
+  const left = await p.evaluate(() => new Promise((ok) => {
+    const st = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".cs-play");
+    const key = () => { for (const type of ["keydown", "keyup"]) st.dispatchEvent(new KeyboardEvent(type, { code: "Space", key: " ", bubbles: true, composed: true })); };
+    const tick = () => {
+      if (game.scene.run.M[59] !== 1) return void requestAnimationFrame(tick);
+      ok(game.scene.run.M[58]);
+      key();
+    };
+    key();
+    requestAnimationFrame(tick);
+  }));
+  assert.ok(left > 0, `the second Space lands inside the double-tap window (${left} s left)`);
   await until(p, () => game.scene.run.M[5] === 0, null, "a double Space lets go: on the street");
   assert.equal((await fb(p)).leaps[2], l0[2] + 1, "LET GO!");
   await pace(p, 1200);
