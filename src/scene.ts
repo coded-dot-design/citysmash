@@ -80,8 +80,8 @@ function palette(c: City, light: boolean) {
 }
 type Pal = ReturnType<typeof palette>;
 const WORDS = ["CRUNCH!", "KRAK!", "SMASH!", "TIMBER!", "FLAT!", "SWAT!", "KA-BLAM!", "NOM!", "BOINK!", "STOMP!", "OOF!", "ZZAP!", "BONK!", "KER-THOOM!", "OUCH! HOT!", "POOF!", "CLANG!", "DERAILED!", "WHAM!", "+100", "+250", "BOOM!", "KNOCKED OFF!", "POUNCE!", "COMBO!", "!", "KRUNCH!"];
-/** The most the rig on a wall comes forward for a side wall seen edge-on (./scene.ts wallFwd). */
-const WALL_FWD = 0.45;
+/** The most the rig on a wall comes forward (and out) for its side wall seen strongly (./scene.ts wallFwd). */
+const WALL_FWD = 0.6;
 const W_CRUNCH = 0, W_TIMBER = 3, W_FLAT = 4, W_SWAT = 5, W_BLAM = 6, W_NOM = 7, W_BOINK = 8, W_STOMP = 9, W_OOF = 10, W_ZAP = 11, W_BONK = 12, W_THOOM = 13, W_HOT = 14, W_POOF = 15, W_CLANG = 16, W_DERAIL = 17, W_WHAM = 18, W_P100 = 19, W_P250 = 20, W_BOOM = 21, W_KNOCK = 22, W_POUNCE = 23, W_COMBO = 24, W_TELL = 25, W_KRUNCH = 26;
 const TOD = ["DAY", "DUSK", "NIGHT"];
 /** Bits of facade knocked off: they fall to the street and stay there as rubble (until the city changes). */
@@ -272,12 +272,12 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       const fs: DioramaObject[] = [];
       for (let fl = 0; fl < f; fl++) {
         const fid = id + "f" + fl;
-        fs.push(dio.add({ id: fid, size: [w, 1, DEPTH], pos: [0, fl, 0], on: id, color: P.walls[lk]!, pick: false, layer: 5, mask: 51 }));
+        fs.push(dio.add({ id: fid, size: [w, 1, DEPTH], pos: [0, fl, 0], on: id, color: P.walls[lk]!, pick: false, layer: 5, mask: 16 }));
         sides(fid, w, 1, DEPTH, -1, P.walls[lk]!, 5);
-        // The ledge: a lip along the front only (the held front comes forward over the rig, ./monster.ts HELD;
-        // a full-depth slab there sliced through a monster behind the front corner at a side camera), its
-        // ends with the side walls.
-        dio.add({ size: [w + 0.12, mark ? 0.14 : 0.09, 0.22], pos: [0, -0.09, DEPTH / 2 - 0.05], on: fid, color: P.ledge[lk]!, pick: false, layer: 6, mask: 51 });
+        // v13: the floor and its ledge keep their front faces only (their ends are the side walls): the held
+        // front comes forward over the rig (./monster.ts HELD), and a floor's top or bottom drawn there cut
+        // brown wedges across a rig on a side wall seen strongly (owner screenshot 167).
+        dio.add({ size: [w + 0.12, mark ? 0.14 : 0.09, 0.22], pos: [0, -0.09, DEPTH / 2 - 0.05], on: fid, color: P.ledge[lk]!, pick: false, layer: 6, mask: 16 });
         sides(fid, w + 0.12, mark ? 0.14 : 0.09, DEPTH + 0.12, -0.09, P.ledge[lk]!, 6);
         for (let col = 0; col < w; col++) {
           const i = C0[b]! + fl * w + col, gf = fl === 0, door = gf && col === ((w / 2) | 0);
@@ -291,9 +291,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       const rid = id + "r";
       roofs.push(dio.add({ id: rid, shape: "group", size: [w, 0, DEPTH], pos: [0, f, 0], on: id, pick: false }));
       // The roof slab and its furniture sort with the side walls (behind a rig on a wall: his head over the
-      // roof, never the tank or the slab over him); a lip along the front stays with the facade.
+      // roof, never the tank or the slab over him); a lip along the front (its front face only) stays with the facade.
       dio.add({ size: [w + 0.16, 0.22, DEPTH + 0.16], pos: [0, 0, 0], on: rid, color: P.roof, cluster: cl + "s", pick: false, layer: 6, mask: 51 });
-      dio.add({ size: [w + 0.16, 0.22, 0.24], pos: [0, 0, DEPTH / 2 - 0.04], on: rid, color: P.roof, pick: false, layer: 6.1, mask: 51 });
+      dio.add({ size: [w + 0.16, 0.22, 0.24], pos: [0, 0, DEPTH / 2 - 0.04], on: rid, color: P.roof, pick: false, layer: 6.1, mask: 16 });
       sides(rid, w + 0.16, 0.22, DEPTH + 0.16, 0, P.roof, 6);
       const R = (s: number[], p: number[], col: string, o: { shape?: "box" | "cyl" | "wedge" | "prism"; sides?: number; top?: number; emissive?: boolean; rot?: number[] } = {}) =>
         dio.add({ shape: o.shape ?? "box", sides: o.sides, top: o.top, size: s, pos: p, rot: o.rot, on: rid, color: col, emissive: o.emissive, cluster: cl + "s", pick: false, layer: 7 });
@@ -550,15 +550,17 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     return moving;
   }
 
-  /** v11 (owner: "he needs to shift forward based on the building angle"): on a wall the rig sits further
-   *  forward, towards the front corner, the less of the side wall the camera sees (seen edge-on, or from the
-   *  far side, a rig set back sinks into the building and the ledges slice it); with the side wall well in
-   *  view it stays set back. From the camera against the building's corner, per frame: render only. */
+  /** v13 (owner, screenshot 167: "detect the perspective of the building and adjust the ape's position to
+   *  be more forward toward the camera"): the more of the side wall he holds the camera sees, the further he
+   *  comes out from it and forward to its front corner, clinging to the outside of the corner; seen edge-on
+   *  he stays set back; hidden (the camera past the front corner), he comes out and forward the same (else the
+   *  facade covers him). The side wall's width on screen against a window's, per frame:
+   *  render only (the run's state, and so rollback, untouched). */
   function wallFwd(O: Float64Array) {
     const b = O[12]!, s = O[22]!, edge = s < 0 ? run.BLD[b * 4]! : run.BLD[b * 4]! + run.BLD[b * 4 + 1]!, y = O[1]! + HAND;
     if (b < 0 || !dio.project(edge, y, 0, tmp) || !dio.project(edge, y, -DEPTH, tmp2)) return 0;
     const side = (tmp2[0]! - tmp[0]!) * s, win = dio.project(edge - s, y, 0, tmp2) ? Math.abs(tmp2[0]! - tmp[0]!) : 1;
-    return WALL_FWD * Math.max(0, Math.min(1, 1 - side / (win * 1.2)));
+    return WALL_FWD * Math.max(0, Math.min(1, (side < 0 ? -3 : 1.2) * (side / win) - 0.1));
   }
   function pose(dt: number) {
     const B = run.B, BLD = run.BLD, C0 = run.C0;
