@@ -134,7 +134,7 @@ try {
   await p.evaluate(() => window.padOn(0));
   await until(p, () => !!document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".cs-pads"), null, "a gamepad: the players panel");
   assert.match(await p.evaluate(`${sr}.querySelector('.cs-pads').textContent`), /GAMEPAD 1.*Press any button to join/);
-  assert.match(await p.evaluate(`${sr}.querySelector('.cs-pads li').textContent`), /Keys: WASD move · Space jump · mouse\/tap smash/);
+  assert.match(await p.evaluate(`${sr}.querySelector('.cs-pads li').textContent`), /Keys: WASD move · Space jump · J punch · K grab · Q\/E aim · or mouse\/tap/);
   const hc = await contrast(p, ".cs-who li:not(.cs-in) small");
   assert.ok(hc >= 4.5, `the join hint passes AA (${hc.toFixed(1)})`);
   await p.evaluate(() => window.padPress(0, true));

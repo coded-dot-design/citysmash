@@ -23,7 +23,7 @@ import {
   E_START, E_HOLE, E_SHAKE, E_FLOOR, E_FLAT, E_HELI, E_HELI_CRASH, E_NOM, E_HURT, E_FLING, E_DROP, E_KO, E_END, E_STOMP, E_JUMP, E_LAND, E_CLIMB,
   E_SHOCK, E_TANK, E_BONK, E_BURN, E_JOIN, E_CHIP_, E_CRACK_, E_ARMOUR, E_TRAIN, E_BELLS, E_RAM, E_TRUCK, E_SURGE, E_CITY, E_CLEAR, E_PUNCH,
   E_POWER, E_KNOCKOFF, E_POUNCE, E_COMBO_HIT, E_TELL, T_RIVAL, T_RIVAL_END, DUMMY, T_TANK, TANK_HITS, TANK_ARMOUR, T_FOE, T_TRUCK, T_GROUND_END,
-  NI, NR, NG, P_ALL, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
+  NI, NR, NG, P_ALL, E_LEAP, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
@@ -31,7 +31,7 @@ import { buildMonster, monName, shade, WALL, TRIMS, HELD, type Look, type Monste
 
 const TAU = 6.283185307179586;
 /** Practice's steps, in ./round.ts P_* order. */
-const PRACTICE = ["Walk", "Jump onto a building's side", "Climb it", "Punch all 7 reach cells", "Grab someone at a window", "Swat the parked helicopter", "Punch past a live (sparking) window", "Power punch the sparring dummy (tap it)", "Pounce on the dummy (jump onto it)"];
+const PRACTICE = ["Walk", "Jump onto a building's side", "Climb it", "Punch all 7 reach cells", "Grab someone at a window", "Swat the parked helicopter", "Punch past a live (sparking) window", "Power punch the sparring dummy (tap it)", "Pounce on the dummy (jump onto it)", "Leap to the next building (jump on a wall)", "Double-tap jump to let go"];
 const mix = (a: string, b: string, k: number) => {
   const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), f = (s: number) => Math.round(((x >> s) & 255) * (1 - k) + ((y >> s) & 255) * k).toString(16).padStart(2, "0");
   return "#" + f(16) + f(8) + f(0);
@@ -140,7 +140,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   const play = L.add(document.createElement("button"));
   play.type = "button";
   play.className = "cs-play";
-  play.setAttribute("aria-label", "CitySmash: A and D walk, W and S climb, K jumps (a jump at a wall grabs it), Space or J punches (W or S held: up or down), L grabs and eats; or tap and click what to smash. Each gamepad joins as a player of its own. M mutes, Escape for the menu");
+  play.setAttribute("aria-label", "CitySmash: WASD or the arrows walk and climb, Space jumps (at a wall: grabs it; on a wall: leaps to the next building, twice: lets go), J punches the aimed window, K or L grabs and eats, Q and E or Tab move the aim; or tap and click what to smash. Each gamepad joins as a player of its own. M mutes, Escape for the menu");
   const hud = L.add(document.createElement("div"));
   hud.className = "cs-hud";
   hud.hidden = !!so.attract;
@@ -175,7 +175,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     scheme: "stick",
     move: ["up", "down", "left", "right"],
     // Move and jump only: everything else is a tap on what to smash or grab.
-    actions: [{ intent: "jump", label: "JUMP", icon: ICON_JUMP, name: "Jump (Space or K)", key: "K", role: "go" }],
+    actions: [{ intent: "jump", label: "JUMP", icon: ICON_JUMP, name: "Jump (Space)", key: "Space", role: "go" }],
     host: stage,
   });
   thePad.el.classList.add("cs-pad");
@@ -993,6 +993,11 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       } else if (type === E_CLEAR) engine.events.emit("clear"), so.on("clear", val);
       else if (type === E_END) engine.events.emit("end"), (endT = 1.1), engine.busy(1.2), so.on("end", val);
       else if (type === E_JUMP) engine.events.emit("jump");
+      else if (type === E_LEAP) {
+        // v14: the leap across the gap (caught the wall: LEAP!), too far (an arc down), let go (a double tap).
+        leaps[val | 0]!++;
+        if (mine(by)) val === 0 ? (toast("TOO FAR: DOWN YOU GO", "bad"), say("Too far to leap: dropped to the street")) : val === 2 ? (toast("LET GO!", "meh"), say("Let go")) : val === 3 && (toast("LEAP!", "clean"), say("Leapt to the next building"));
+      }
       else if (type === E_CLIMB) engine.events.emit("climb");
       else if (type === E_LAND && MV[by | 0]![19]! > 0.5) {
         const O = MV[by | 0]!;
@@ -1057,7 +1062,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     if (was[3] !== ph) {
       was[3] = ph;
       const touch = !!thePad.el.offsetParent;
-      hintEl.textContent = ph === READY ? (touch ? "↑ at a wall grabs it · ✊ punches the window next to you · ✋ eat a snack · sparks bite" : "A/D walk · K jump at a wall to grab it · W/S climb · Space punch (hold W/S: up, down) · L eat · sparks bite") : "";
+      hintEl.textContent = ph === READY ? (touch ? "↑ at a wall grabs it · ✊ punches the window next to you · ✋ eat a snack · sparks bite" : "J punch · K grab · Space jump (on a wall: leap; twice: let go) · Tab/Q-E aim · WASD move · or click") : "";
     }
     // The card between cities.
     if (ph === CLEAR && cardUp !== ci) {
@@ -1709,6 +1714,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   /** v12: fight pops shown so far (tests): BOOM!, KNOCKED OFF!, POUNCE!; the wall's grab outline's time left, and where it last was. */
   const fights = [0, 0, 0];
   let wallShow = 0, wallKey = -1;
+  const leaps = [0, 0, 0, 0];
   let tapK = 0, tapT = 0, tapF = 0, hoverC = -1, hoverG = false, hoverT = 0, missF = 0, missX = 0, missY = 0, pops = 0, hint = "", tapFace = 0;
   /** This screen's own monster (online its seat's, else seat one's). */
   function own() {
@@ -1830,7 +1836,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   function paintReach(ctx: CanvasRenderingContext2D) {
     const O = own();
     if (O[5] === CLIMB && O[24] === IN && !so.attract) {
-      const my = O[28] === 0 && !net ? I1[1]! : 0, row = my > 0.3 ? 3 : my < -0.3 ? 5 : 0, aimC = row + Math.min(row ? 1 : 2, O[39]!), trim = TRIMS[look.trim]?.c ?? P.zap;
+      // v14: the keyboard's aim (Q/E, Tab, a click moves it); up or down held picks the row as before.
+      const my = O[28] === 0 && !net ? I1[1]! : 0, row = my > 0.3 ? 3 : my < -0.3 ? 5 : 0, ka = aimOf(0, O), aimC = row || ka < 0 ? row + Math.min(row ? 1 : 2, O[39]!) : ka, trim = TRIMS[look.trim]?.c ?? P.zap;
       const pulse = calm ? 0.5 + 0.5 * Math.sin(engine.time * 8) : 0.5;
       for (let k = 0; k < NR; k++) {
         const i = run.reachCell(O, k);
@@ -1838,10 +1845,12 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         const live = run.LIVE[i]! > 0 && run.cell[i] !== HOLE, aimed = k === aimC && hoverT <= 0;
         ctx.globalAlpha = aimed ? 0.8 : 0.38;
         // The stick's aim (the keyboard's, the gamepad's) previews its punch in the punch's green.
-        ctx.strokeStyle = live ? P.zap : aimed ? P.pickHit : trim;
-        ctx.lineWidth = aimed ? 2.2 : 1.2;
+        // (someone at it: K grabs them, the grab's teal)
+        ctx.strokeStyle = live ? P.zap : aimed ? (run.occ[i] && run.cell[i] !== HOLE ? P.pickGrab : P.pickHit) : trim;
+        ctx.lineWidth = aimed ? 2.6 : 1.2;
         if (live) ctx.globalAlpha = Math.min(1, ctx.globalAlpha + pulse * 0.3);
         ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
+        if (aimed) (ctx.globalAlpha = 0.16), (ctx.fillStyle = ctx.strokeStyle), ctx.fillRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
       }
     }
     // The grab's reach (from the facing hand: in front, above, below), only where it helps: while the mouse
@@ -1958,7 +1967,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   }
 
   // ---- input: seat one (the keyboard and mouse, or touch: one person a device), seats two to four (gamepads) ----
-  const GP = new Float64Array(SEATS * 6), GB = new Uint8Array(SEATS * 3);
+  const GP = new Float64Array(SEATS * 6), GB = new Uint8Array(SEATS * 5);
   /** Read every seat on this screen into IN (NI numbers a seat); seat one's tap or click rides as a target. */
   function readSeats(out: Float64Array) {
     out.fill(0);
@@ -1974,6 +1983,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       I1[4] = c.hit(GRAB) || GP[4]! ? 1 : 0;
       I1[5] = 0;
       if (tapK) (I1[5] = tapT), (I1[tapK === 1 ? 2 : 4] = 1), (tapK = 0);
+      else aimIn(I1, 0, 0, own());
     }
     for (let j = 0; j < NI; j++) out[j] = I1[j]!;
     for (let s = 1; s < SEATS; s++) {
@@ -1983,8 +1993,42 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       out[s * NI + 2] = GP[o + 2]!;
       out[s * NI + 3] = GP[o + 3]!;
       out[s * NI + 4] = GP[o + 4]!;
+      for (let k = 0; k < NM; k++) if (MV[k]![28] === s && MV[k]![24] === IN) aimIn(out, s * NI, s, MV[k]!);
     }
     for (let s = 0; s < SEATS; s++) GP[s * 6 + 2] = GP[s * 6 + 3] = GP[s * 6 + 4] = 0;
+  }
+  /** v14, the aim without a mouse: on a wall each seat on this screen (the keys, a gamepad) has an aim on one of
+   *  the seven reach cells (AIMS; −1 none), set to the nearest unbroken window (level, close first) on each new wall,
+   *  on past a hole; Q/E, Tab or the pad's LB/RB step it through AIM_ORDER (top row, level, bottom), a click sets it.
+   *  The punch goes at it as a tapped target (the rules see only the target: online and rollback as before); up or down
+   *  held picks the row as before; the grab takes whoever is at it, else the nearest. */
+  const AIM_ORDER = [3, 4, 0, 1, 2, 5, 6], AIM_FIRST = [0, 1, 2, 5, 6, 3, 4], AIMS = new Int8Array(SEATS).fill(-1), AIMW = new Float64Array(SEATS).fill(-1);
+  const aimOk = (O: Float64Array, c: number, live: boolean) => {
+    const i = run.reachCell(O, c);
+    return i >= 0 && run.cell[i] !== HOLE && (live || !run.LIVE[i]);
+  };
+  function aimStep(O: Float64Array, from: number, d: number) {
+    let j = AIM_ORDER.indexOf(from);
+    for (let n = 0; n < NR; n++) if (((j = (j + d + NR) % NR), aimOk(O, AIM_ORDER[j]!, true))) return AIM_ORDER[j]!;
+    return from;
+  }
+  function aimOf(s: number, O: Float64Array) {
+    if (O[5] !== CLIMB) return (AIMS[s] = -1), (AIMW[s] = -1);
+    const w = O[12]! * 2 + (O[22]! > 0 ? 1 : 0);
+    if (AIMW[s] !== w || AIMS[s]! < 0) {
+      AIMW[s] = w;
+      AIMS[s] = 0;
+      for (let q = 0; q < 2 * NR; q++) if (aimOk(O, AIM_FIRST[q % NR]!, q >= NR)) return (AIMS[s] = AIM_FIRST[q % NR]!);
+    }
+    if (!aimOk(O, AIMS[s]!, true)) AIMS[s] = aimStep(O, AIMS[s]!, 1);
+    return AIMS[s]!;
+  }
+  function aimIn(I: Float64Array, o: number, s: number, O: Float64Array) {
+    const a = aimOf(s, O);
+    if (a < 0 || I[o + 5]) return;
+    const i = run.reachCell(O, a);
+    if (I[o + 2] && Math.abs(I[o + 1]!) < 0.5) I[o + 5] = T_CELL + a;
+    else if (I[o + 4] && !I[o + 2] && i >= 0 && run.occ[i] && run.cell[i] !== HOLE) I[o + 5] = T_GRAB + a;
   }
   function gamepadRead() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : null;
@@ -1999,11 +2043,13 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       const dz = (a: number) => (a > 0.2 ? (a - 0.2) / 0.8 : a < -0.2 ? (a + 0.2) / 0.8 : 0);
       GP[o] = dz(ax[0] ?? 0) || v(15) - v(14);
       GP[o + 1] = dz(ax[1] ?? 0) || v(13) - v(12);
-      const now0 = v(2) || v(7), now1 = v(0), now2 = v(1) || v(3), g = n * 3;
+      const now0 = v(2) || v(7), now1 = v(0), now2 = v(1) || v(3), lb = v(4), rb = v(5), g = n * 5;
       if (now0 && !GB[g]) GP[o + 2] = 1;
       if (now1 && !GB[g + 1]) GP[o + 3] = 1;
       if (now2 && !GB[g + 2]) GP[o + 4] = 1;
-      GB[g] = now0; GB[g + 1] = now1; GB[g + 2] = now2;
+      // v14: LB / RB step this pad's aim on a wall.
+      if ((lb && !GB[g + 3]) || (rb && !GB[g + 4])) for (let k = 0; k < NM; k++) if (MV[k]![28] === n && aimOf(n, MV[k]!) >= 0) AIMS[n] = aimStep(MV[k]!, AIMS[n]!, lb && !GB[g + 3] ? -1 : 1);
+      GB[g] = now0; GB[g + 1] = now1; GB[g + 2] = now2; GB[g + 3] = lb; GB[g + 4] = rb;
       const any = GP[o] || GP[o + 1] || now0 || now1 || now2;
       // A pad's first press brings its seat in.
       if (any && !net && !(seatsIn & (1 << n)) && endC.hidden) join(n, true);
@@ -2076,13 +2122,20 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     },
   });
 
-  // Keys on the stage: seat one (WASD or the arrows, Space/J, K, L), M mutes, Escape is the menu.
-  const MAP: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down", Space: "jump", KeyJ: "punch", KeyK: "jump", KeyL: "grab" };
+  // Keys on the stage: seat one (WASD or the arrows, Space jump, J punch, K or L grab, Q/E or Tab the aim), M mutes, Escape is the menu.
+  const MAP: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down", Space: "jump", KeyJ: "punch", KeyK: "grab", KeyL: "grab" };
   const ARROWS: Record<string, string> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
   stage.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.code === "KeyM") return void (e.preventDefault(), toggle());
     if (e.code === "Escape") return void (e.preventDefault(), so.on("menu", 0));
+    // v14: the aim without a mouse (on a wall): Q / Shift+Tab back, E / Tab on through the seven cells (Tab only on a wall: off it, it moves focus).
+    const O = own(), q = e.code === "KeyQ" || e.code === "KeyE" || (e.code === "Tab" && O[5] === CLIMB && endC.hidden && !(e.target as Element).closest?.(".cs-card"));
+    if (q) {
+      e.preventDefault();
+      if (O[5] === CLIMB && aimOf(0, O) >= 0) (AIMS[0] = aimStep(O, AIMS[0]!, e.code === "KeyQ" || e.shiftKey ? -1 : 1)), (dirty = true), (auto = false), engine.wake();
+      return;
+    }
     const k = MAP[e.code] ?? ARROWS[e.code];
     if (!k || (e.target as Element).closest?.(".bui-pad")) return;
     if ((e.target as Element).closest?.(".cs-card") && (e.code === "Space" || e.code === "Enter")) return;
@@ -2108,6 +2161,11 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     if (t <= 0) return;
     tapK = isPunch(t) ? 1 : 2;
     tapT = t;
+    // v14: a click on a reach cell (a punch or a grab at it) moves the keyboard's aim there.
+    {
+      const O = own(), g = t >= T_CELL && t < T_GRAB ? t - T_CELL : t >= T_GRAB && t < T_GRAB + NR && O[5] === CLIMB ? t - T_GRAB : -1;
+      if (g >= 0 && aimOf(0, O) >= 0) AIMS[0] = g;
+    }
     tapF = 0.7;
     tapFace = own()[6]!;
     if (t === T_MISS) {
@@ -2146,7 +2204,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     },
     /** v11: pops shown for grabs and swats so far, and the last TOO FAR's hint (tests). */
     get feedback() {
-      return { pops, hint, miss: missF > 0, tap: tapT, boom: fights[0], knocked: fights[1], pounced: fights[2], wallShow, stops };
+      return { pops, hint, miss: missF > 0, tap: tapT, leaps: leaps.slice(), aim: AIMS[0]!, aims: [...AIMS], boom: fights[0], knocked: fights[1], pounced: fights[2], wallShow, stops };
     },
     /** What a tap at canvas point (x, y) would do (a target code, ./round.ts T_*). */
     tapAt,

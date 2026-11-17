@@ -12,10 +12,10 @@
 // helicopters). Deterministic: one seeded random in the state, fixed inputs → the same run; every
 // number in typed arrays (`bytes`: the rollback saves and restores them); zero allocation per step.
 import { createBlock, STAND, FALL, RUBBLE, HOLE, STREET0, STREET1, E_CHIP, E_CRACK, type Block } from "./block.ts";
-import { createClimber, WALK, AIR, CLIMB, ROOF, KO, ZS, HAND, CLIMB_TOP, G, OUT, IN, WAIT } from "./climber.ts";
+import { createClimber, WALK, AIR, CLIMB, ROOF, KO, ZS, HAND, CLIMB_TOP, G, OUT, IN, WAIT, E_LEAP, LEAP_TAP } from "./climber.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, SKYPORT } from "./cities.ts";
 
-export { WALK, AIR, CLIMB, ROOF, KO, OUT, IN, WAIT };
+export { WALK, AIR, CLIMB, ROOF, KO, OUT, IN, WAIT, E_LEAP, LEAP_TAP };
 export const READY = 0, RUN = 1, CLEAR = 2, DONE = 3;
 /** Events (one ring, read and cleared each step): what, a value, and which monster. */
 export const E_START = 1, E_PUNCH = 2, E_HOLE = 3, E_SHAKE = 4, E_FLOOR = 5, E_FLAT = 6, E_HELI = 7, E_HELI_CRASH = 8, E_NOM = 9,
@@ -25,7 +25,7 @@ export const E_START = 1, E_PUNCH = 2, E_HOLE = 3, E_SHAKE = 4, E_FLOOR = 5, E_F
   /** v12, the fight: a power punch lands on a rival (v: its monster), knocks one off a wall, a pounce, a combo on a stunned one, an AI's tell. */
   E_POWER = 37, E_KNOCKOFF = 38, E_POUNCE = 39, E_COMBO_HIT = 40, E_TELL = 41;
 /** The monsters, in seat order online: the ape, then the rivals. */
-export const NM = 4, MW = 58, HERO = 0, CRAB = 1, BLOB = 2, MOTH = 3;
+export const NM = 4, MW = 60, HERO = 0, CRAB = 1, BLOB = 2, MOTH = 3;
 /** Who drives a monster: a seat 0..3, or the AI. */
 export const SEATS = 4, AI = 9;
 export const MAX_HP = 100, SHOCK_HP = 7;
@@ -104,7 +104,7 @@ export const isPunch = (t: number) => (t >= T_CELL && t < T_GRAB) || (t >= T_HEL
 /** Practice (S[28]): one player, no army (a parked helicopter that never fires), no health lost, flattened
  *  buildings come back; its steps (bits in S[29]): walk, onto a wall, climb, punch all seven reach cells
  *  (S[30], a bit a cell), eat someone, swat the helicopter, a punch past a live window. */
-export const P_WALK = 1, P_WALL = 2, P_CLIMB = 4, P_REACH = 8, P_NOM = 16, P_HELI = 32, P_LIVE = 64, P_POWER = 128, P_POUNCE = 256, P_ALL = 511;
+export const P_WALK = 1, P_WALL = 2, P_CLIMB = 4, P_REACH = 8, P_NOM = 16, P_HELI = 32, P_LIVE = 64, P_POWER = 128, P_POUNCE = 256, P_LEAP = 512, P_LETGO = 1024, P_ALL = 2047;
 /** v12: practice's sparring dummy (a harmless training rival: it never fights back, never runs out of health). */
 export const DUMMY = 1;
 /** A run. `step(dt, IN)`: IN holds NI numbers per seat (mx, my −1..1 with my up, punch, jump, grab: 1 on the press, a target). */
@@ -132,7 +132,8 @@ export function createRun(seed = 20261116) {
    *  needs a hold: the bottom floor stays in reach), [49] turning round for a grab behind (time left), [50] [51] where
    *  the grab reaches to (x, y; 0: nowhere picked: the arm's own reach), [52] v12: the power punch's rival + 1 (0: none),
    *  [53] stunned (time left: no moves), [54] fighting (time left: the health bar shows), [55] an AI pounce's crouch (time
-   *  left, then the jump), [56] a grab re-queued after a turn (it chained already: the combo counts it once), [57] spare. */
+   *  left, then the jump), [56] a grab re-queued after a turn (it chained already: the combo counts it once), [57] an AI pounce's
+   *  target + 1, [58] v14: a leap's double-tap window, [59] a leap under way (1) or let go (2) (./climber.ts). */
   const MS = new Float64Array(NM * MW), MV: Float64Array[] = [];
   for (let k = 0; k < NM; k++) MV.push(MS.subarray(k * MW, k * MW + MW)), (MV[k]![31] = k);
   let M = MV[0]!, cur = 0;
@@ -163,7 +164,7 @@ export function createRun(seed = 20261116) {
 
   function emit(t: number, v: number) {
     if (t === E_WHIFF) M[46] = 1;
-    if (S[28] && cur === 0) S[29] = S[29]! | (t === E_NOM ? P_NOM : t === E_HELI ? P_HELI : 0);
+    if (S[28] && cur === 0) S[29] = S[29]! | (t === E_NOM ? P_NOM : t === E_HELI ? P_HELI : t === E_LEAP && v === 3 ? P_LEAP : t === E_LEAP && v === 2 ? P_LETGO : 0);
     if (run.n < 32) (ev[run.n * 3] = t), (ev[run.n * 3 + 1] = v), (ev[run.n * 3 + 2] = cur), run.n++;
     if (t === E_CHIP) pts(1);
     else if (t === E_CRACK) pts(2);
@@ -364,6 +365,7 @@ export function createRun(seed = 20261116) {
     if (M[15]! > 0 || M[5] === KO) return;
     M[5] = AIR;
     M[12] = -1;
+    M[58] = M[59] = 0;
     M[4] = 6;
     M[3] = vx;
     hurt(n);
@@ -380,6 +382,7 @@ export function createRun(seed = 20261116) {
     const wasOn = M[5] === CLIMB || M[5] === ROOF;
     M[5] = AIR;
     M[12] = -1;
+    M[58] = M[59] = 0;
     M[4] = 3.5;
     M[3] = wasOn ? -M[6]! * 3 : 0;
     if (M[7]! <= 0) knockOut();
@@ -678,7 +681,7 @@ export function createRun(seed = 20261116) {
     O[7] = Math.max(S[28] ? 1 : 0, O[7]! - 6);
     O[11] = 0.3;
     O[54] = M[54] = FIGHT_T;
-    if (O[5] === CLIMB || O[5] === ROOF) (O[5] = AIR), (O[12] = -1), (O[4] = 4), (O[3] = M[6]! * 5), (O[15] = 0.7);
+    if (O[5] === CLIMB || O[5] === ROOF) (O[5] = AIR), (O[12] = -1), (O[4] = 4), (O[3] = M[6]! * 5), (O[15] = 0.7), (O[58] = O[59] = 0);
     else O[3] = M[6]! * 3;
     pts(30);
     emit(E_BONK, j);
@@ -734,7 +737,7 @@ export function createRun(seed = 20261116) {
     const stun = O[53]! > 0, on = O[5] === CLIMB || O[5] === ROOF, dir = O[0]! >= M[0]! ? 1 : -1;
     fightHit(j, POWER_HP + (stun ? COMBO_HP : 0));
     O[53] = 0; O[8] = O[34] = O[52] = O[20] = O[21] = 0;
-    O[5] = AIR; O[12] = -1; O[4] = on ? 2.5 : 5; O[3] = dir * (on ? 6 : 8); O[15] = 0.6;
+    O[5] = AIR; O[12] = -1; O[4] = on ? 2.5 : 5; O[3] = dir * (on ? 6 : 8); O[15] = 0.6; O[58] = O[59] = 0;
     pts(stun ? 160 : 80);
     if (S[28] && cur === 0) S[29] = S[29]! | P_POWER;
     emit(E_POWER, j);
@@ -766,7 +769,7 @@ export function createRun(seed = 20261116) {
       const on = O[5] === CLIMB || O[5] === ROOF;
       fightHit(j, POUNCE_HP);
       O[53] = STUN_T; O[8] = O[34] = O[52] = O[20] = O[21] = 0;
-      if (on) (O[5] = AIR), (O[12] = -1), (O[4] = 0), (O[3] = 0), (O[15] = 0.6);
+      if (on) (O[5] = AIR), (O[12] = -1), (O[4] = 0), (O[3] = 0), (O[15] = 0.6), (O[58] = O[59] = 0);
       M[4] = 7; M[3] = M[6]! * 1.5;
       pts(60);
       if (S[28] && cur === 0) S[29] = S[29]! | P_POUNCE;
@@ -1385,7 +1388,7 @@ export function createRun(seed = 20261116) {
       const b = M[12]!, s = M[22]!;
       I[0] = -s * 0.3;
       // A surge coming (the plant): off the wall next to a live part.
-      if (FE[9]! > 0 && FE[9]! < 1.4) return void ((I[3] = 1), setCur(0));
+      if (FE[9]! > 0 && FE[9]! < 1.4) return void ((I[3] = 2), setCur(0));
       // The same reach as a player: the best cell in it (no hole, nothing live; level first, then down, then up).
       for (let q = 0; q < NR && B[b * 6] === STAND; q++) {
         const c = AI_ORDER[q]!, i = reachCell(M, c);
@@ -1398,7 +1401,7 @@ export function createRun(seed = 20261116) {
       if (M[1]! > 0.1 && B[b * 6] === STAND) return void ((I[1] = -1), setCur(0));
       A[1] = -s;
       A[3] = 0;
-      return void ((I[3] = 1), setCur(0));
+      return void ((I[3] = 2), setCur(0));
     }
     // On the street: pick a building and a side, walk at its wall, jump at it.
     let tb = A[0]!;

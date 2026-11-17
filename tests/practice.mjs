@@ -50,6 +50,8 @@ try {
       out.card = !root.querySelector(".cs-prac").hidden;
       // v12: the sparring dummy: a power punch at it (a tap), then a pounce onto it; it never fights back or runs out.
       const D = r.MV[1], st = (O, x, f) => { O[5] = 0; O[0] = x; O[1] = 0; O[2] = 1.9; O[3] = O[4] = 0; O[6] = f; O[8] = O[34] = O[45] = O[15] = O[53] = 0; O[12] = -1; };
+      // (the minute on the autopilot can leave a parachute or a soldier drifting in front of the dummy: a tap there is theirs)
+      r.CH.fill(0); r.SO.fill(0);
       st(D, -2, -1); st(M, -4.4, 1); step(2);
       const cv = root.querySelector("canvas"), [px, py] = sc.project(D[0], D[1] + sc.rig(1).height * 0.5, D[2]);
       out.tapT = sc.tapAt(px, py);
@@ -71,7 +73,7 @@ try {
     assert.ok(res.power && res.pounce && res.stunned, `${at}: the power punch and the pounce steps tick off; the pounce stuns it`);
     assert.ok(res.dummyHp >= 1 && res.dummyIn, `${at}: twelve power punches and the dummy is still in (${res.dummyHp})`);
     assert.equal(res.dummyChip, "DUMMY", `${at}: its chip says DUMMY`);
-    assert.equal(res.ticked2, 9, `${at}: nine steps on the card`);
+    assert.equal(res.ticked2, 11, `${at}: eleven steps on the card`);
     assert.equal(res.lo, 100, `${at}: a minute on the autopilot loses no health`);
     assert.ok(!res.done, `${at}: it never ends`);
     assert.ok(res.shocked && res.hp === 100, `${at}: a live window shocks but takes no health (${res.hp})`);

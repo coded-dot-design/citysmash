@@ -78,7 +78,10 @@ try {
   await until(p, () => game.scene.run.M[8] > 0, null, "out of reach: a swing");
   await until(p, () => game.scene.run.M[8] === 0, null, "the swing ends");
   assert.equal(await hits(p), h0, "out of reach: nothing hit");
-  // The keyboard fallback (J): the window by the hand, chip, crack, hole.
+  // The keyboard (J): the aimed window (the click on the far one moved the aim there; Q twice: back to the one by the hand), chip, crack, hole.
+  await p.keyboard.press("q");
+  await p.keyboard.press("q");
+  assert.equal(await p.evaluate(() => game.scene.feedback.aim), 0, "Q steps the aim back to the window by the hand");
   const cell = await p.evaluate(() => { const r = game.scene.run; return r.C0[1] + 3 * r.BLD[1 * 4 + 1]; });
   for (let n = 0; n < 3; n++) {
     await p.keyboard.press("j");
@@ -99,6 +102,9 @@ try {
   // One hole short, then the last: it shakes and pancakes to rubble.
   await hang(p, 1, -1, 2);
   await p.evaluate(() => { const r = game.scene.run; r.B[1 * 6 + 1] = r.bk.NEED[1] - 1; });
+  // (the click on the person one in moved the aim there: Q, back to the window by the hand)
+  await p.keyboard.press("q");
+  assert.equal(await p.evaluate(() => game.scene.feedback.aim), 0, "the aim on the window by the hand");
   const c2 = cell - 5;
   for (let n = 0; n < 3; n++) {
     await p.keyboard.press("j");

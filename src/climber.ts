@@ -6,7 +6,9 @@
 // jump, drop-off). Grown from the Fizlet gallery daily (DOM Kaiju, #124), same numbers.
 // Monster fields (MW numbers each, see ./round.ts): [0] x, [1] y, [2] z, [3] vx, [4] vy, [5] mode,
 // [6] face, [8] punch cooldown, [12] on building, [13] walk phase, [15] invulnerable, [19] land squash,
-// [22] the side it hangs on, [23] shock, [24] in play, [31] kind, [33] climbing up or down a moment ago.
+// [22] the side it hangs on, [23] shock, [24] in play, [31] kind, [33] climbing up or down a moment ago,
+// [58] v14: a leap's double-tap window (time left: a second jump lets go), [59] a leap under way (1: it keeps
+// its line to the wall across the gap; 2: let go or too far, it catches no wall till it lands).
 import { STREET0, type Block } from "./block.ts";
 
 /** Monster modes. */
@@ -23,6 +25,12 @@ export const G = 26;
 /** A monster in play, waiting to come in, or out. */
 export const OUT = 0, IN = 1, WAIT = 2;
 export const E_JUMP = 18, E_LAND = 19, E_CLIMB = 20, E_OUT = 24;
+/** v14 (owner: "tap = switch buildings, double tap = let go"): a jump on a wall leaps across the gap to the next
+ *  building's near wall (LEAP_MAX at most, LEAP_T s plus a little a unit, the same height or the highest it can
+ *  hang; next door the two hanging spots meet in the gap, so it is a hop and a turn); none in range: a short arc
+ *  down to the street (TOO FAR). A second jump within LEAP_TAP s (it catches no wall till then) lets go: it drops
+ *  straight to the street. The event E_LEAP: v 0 too far, 1 a leap, 2 let go, 3 caught the wall across. */
+export const E_LEAP = 42, LEAP_MAX = 9, LEAP_T = 0.34, LEAP_TAP = 0.3;
 void STREET0;
 
 export interface ClimberHooks {
@@ -46,6 +54,27 @@ export function createClimber(bk: Block, h: ClimberHooks) {
     M[5] = CLIMB; M[12] = b; M[22] = s; M[0] = wallX(b, s); M[3] = 0; M[4] = 0; M[6] = -s; M[33] = 0;
     if (M[1]! < 0.05) M[1] = 0.05;
     h.emit(E_CLIMB, b);
+    if (M[59] === 1) h.emit(E_LEAP, 3);
+    M[58] = M[59] = 0;
+  }
+  /** v14: a jump on the wall of building b, side s: the leap to the nearest standing building's near wall across the
+   *  gap (in reach), else the short arc down; `off` (2) lets go at once (the AI's way down). */
+  function leap(M: Float64Array, b: number, s: number, off: number) {
+    M[5] = AIR; M[12] = -1; M[6] = s; M[33] = 0;
+    if (off) return void ((M[3] = s * 0.8), (M[4] = 0), (M[59] = 2), h.emit(E_LEAP, 2));
+    const x = M[0]!;
+    let t = -1, d = LEAP_MAX;
+    for (let c = 0; c < bk.nb(); c++) {
+      if (c === b || !standing(c) || top(c) - CLIMB_TOP < 0.4) continue;
+      const e = (wallX(c, -s) - x) * s;
+      if (e > -0.05 && e <= d) (d = Math.max(0, e)), (t = c);
+    }
+    M[58] = LEAP_TAP;
+    if (t < 0) return void ((M[3] = s * 3), (M[4] = 6), (M[59] = 2), h.emit(E_LEAP, 0), h.emit(E_JUMP, 1));
+    const T = LEAP_T + d * 0.03, y = Math.max(0.05, Math.min(M[1]!, top(t) - CLIMB_TOP - 0.3));
+    M[3] = (s * d) / T; M[4] = (y - M[1]! + 0.5 * G * T * T) / T; M[59] = 1;
+    h.emit(E_LEAP, 1);
+    h.emit(E_JUMP, 1);
   }
   /** The building under the climbers goes: they drop off. */
   function dropOff(M: Float64Array, b: number) {
@@ -58,6 +87,8 @@ export function createClimber(bk: Block, h: ClimberHooks) {
   /** One step of monster M (its index `k`, for the events), with the stick (mx, my up) and a jump press. */
   function step(M: Float64Array, k: number, dt: number, mx: number, my: number, jump: number, hero: boolean) {
     const md = M[5]!, SX = bk.L[3]!;
+    // (a leap's state lives only in the air: whatever put it elsewhere, it is gone)
+    if (md !== AIR) M[58] = M[59] = 0;
     // (Not while it turns round for a grab behind it, ./round.ts TURN_T.)
     if (Math.abs(mx) > 0.25 && md !== KO && md !== CLIMB && !(M[49]! > 0)) M[6] = mx > 0 ? 1 : -1;
     M[8] = Math.max(0, M[8]! - dt); M[11] = Math.max(0, M[11]! - dt); M[14] = Math.max(0, M[14]! - dt); M[15] = Math.max(0, M[15]! - dt); M[18] = Math.max(0, M[18]! - dt);
@@ -82,7 +113,12 @@ export function createClimber(bk: Block, h: ClimberHooks) {
       if (Math.abs(M[0]!) > SX + 2.5) (M[24] = OUT), h.emit(E_OUT, k);
       return;
     } else if (md === AIR || md === KO) {
-      if (md === AIR) M[3] = M[3]! + (mx * 5 - M[3]!) * Math.min(1, dt * 5);
+      // A second jump inside the leap's window lets go (straight down); a leap keeps its line.
+      if (md === AIR && M[58]! > 0) {
+        M[58] = Math.max(0, M[58]! - dt);
+        if (jump) (M[58] = 0), (M[59] = 2), (M[3] = M[3]! * 0.1), (M[4] = Math.min(0, M[4]!)), h.emit(E_LEAP, 2);
+      }
+      if (md === AIR) M[59] !== 1 && (M[3] = M[3]! + (mx * 5 - M[3]!) * Math.min(1, dt * 5));
       else M[3] = M[3]! * (1 - dt * 3);
       M[4] = M[4]! - G * dt;
       const x0 = M[0]!;
@@ -90,7 +126,7 @@ export function createClimber(bk: Block, h: ClimberHooks) {
       const y0 = M[1]!;
       M[1] = y0 + M[4]! * dt;
       // A jump at a wall grabs it (the hanging spot crossed, or reached, heading at the building).
-      if (md === AIR && M[23]! <= 0 && M[15]! <= 0 && M[1]! > 0.15) {
+      if (md === AIR && M[59] !== 2 && !(M[59] === 1 && M[58]! > 0) && M[23]! <= 0 && M[15]! <= 0 && M[1]! > 0.15) {
         const v = M[3]! || M[6]! * 0.5, w = wallAt(M[0]!, v, M[1]!, 0.55 + Math.abs(M[0]! - x0));
         if (w >= 0) return hang(M, w);
       }
@@ -98,9 +134,10 @@ export function createClimber(bk: Block, h: ClimberHooks) {
       let rb = -1;
       for (let b = 0; b < bk.nb(); b++) if (standing(b) && M[0]! > BLD[b * 4]! + 0.1 && M[0]! < BLD[b * 4]! + BLD[b * 4 + 1]! - 0.1) rb = b;
       const over = rb >= 0 && M[2]! < ZS - 1.2 && y0 >= top(rb) - 0.05;
-      if (!over) M[2] = M[2]! + (ZS - M[2]!) * Math.min(1, dt * 5);
-      if (over && M[4]! <= 0 && M[1]! <= top(rb)) return void ((M[1] = top(rb)), (M[4] = 0), (M[5] = md === KO ? KO : ROOF), (M[12] = rb), (M[19] = 1), h.emit(E_LAND, 1));
+      if (!over && M[59] !== 1) M[2] = M[2]! + (ZS - M[2]!) * Math.min(1, dt * 5);
+      if (over && M[4]! <= 0 && M[1]! <= top(rb)) return void ((M[1] = top(rb)), (M[4] = 0), (M[5] = md === KO ? KO : ROOF), (M[12] = rb), (M[19] = 1), (M[58] = M[59] = 0), h.emit(E_LAND, 1));
       if (M[1]! <= 0) {
+        M[58] = M[59] = 0;
         const fall = -M[4]!;
         M[1] = 0;
         M[4] = 0;
@@ -134,7 +171,8 @@ export function createClimber(bk: Block, h: ClimberHooks) {
       M[48] = M[1]! <= 0.05 && mv < -0.3 ? M[48]! + dt : 0;
       if (M[48]! > DROP_HOLD && M[33]! < -0.3) return void ((M[1] = 0), (M[5] = WALK), (M[12] = -1), (M[33] = 0), (M[48] = 0));
       if (M[1]! < 0.05) M[1] = 0.05;
-      if (jump) return void ((M[5] = AIR), (M[12] = -1), (M[4] = 7.5), (M[3] = s * 5.5), (M[6] = s), h.emit(E_JUMP, 1));
+      // v14: a jump leaps to the next building across the gap (2, the AI's: lets go).
+      if (jump) return leap(M, b, s, jump === 2 ? 1 : 0);
     } else if (md === ROOF) {
       const b = M[12]!, x0 = BLD[b * 4]!, w = BLD[b * 4 + 1]!;
       M[1] = top(b);
@@ -149,6 +187,6 @@ export function createClimber(bk: Block, h: ClimberHooks) {
     if (M[5] === WALK && Math.abs(M[0]!) > SX - 0.5 && !hero) M[0] = M[0]! - (M[0]! > 0 ? 1 : -1) * dt * 3;
     if (M[5] === WALK && hero) M[0] = Math.max(-SX, Math.min(SX, M[0]!));
   }
-  return { step, wallAt, hang, dropOff };
+  return { step, wallAt, hang, dropOff, leap };
 }
 export type Climber = ReturnType<typeof createClimber>;
