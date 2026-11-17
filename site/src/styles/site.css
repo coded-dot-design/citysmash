@@ -67,6 +67,9 @@ html.bui[data-theme="light"] .panel{box-shadow:5px 5px 0 var(--ink)}
 @media (max-width:560px){.cards,.modes,.cards.three{grid-template-columns:1fr}.brand small{display:none}.section{padding:52px 0}
 .dt-hero{min-height:calc(100svh - 66px);align-items:end}.dt-hero::before{background:linear-gradient(0deg,color-mix(in srgb,#0d0b1c 88%,transparent) 0%,color-mix(in srgb,#0d0b1c 55%,transparent) 42%,transparent 70%)}.dt-copy{padding:24px 0 28px}}
 @media (pointer:coarse) and (max-width:900px){[data-app] .site-head{display:none}[data-app] .play-stage{height:100svh}}
+/* Phone landscape: the header steps aside, the stage is the visible viewport (the page sets --vvh from
+   visualViewport; dvh else) with no floor, inside the notch's and the home bar's safe areas. */
+@media (pointer:coarse) and (orientation:landscape) and (max-height:540px){[data-app] .site-head{display:none}[data-app] .play-stage{height:100svh;height:var(--vvh,100dvh);min-height:0}[data-app] .play-host{inset:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}}
 [data-app] .head-keys{margin-left:auto}
 .bui .start-key{background:#39ffb0}.bui .start-key b,.bui .start-key span{color:#07060f}
 .brand b{white-space:nowrap}

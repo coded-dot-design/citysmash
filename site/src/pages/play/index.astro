@@ -1,5 +1,6 @@
 ---
-// CitySmash, the game: the stage fills the screen under the header. An invite link
+// CitySmash, the game: the stage fills the screen under the header (phone landscape: the whole
+// visible viewport, the header out of the way). An invite link
 // (?mode=online&room=…&code=…) drops the player straight into that room.
 import Base from '../../layouts/Base.astro';
 import { ROOMS } from '../../site';
@@ -15,6 +16,13 @@ const description = 'Play CitySmash: a giant cyber ape climbs and smashes seven 
 <script>
   import { createCitySmash } from "../../../../dist/citysmash.mjs";
   const host = document.getElementById("game")!;
+  // The visible viewport's height (phone landscape sizes the stage by it: toolbars in or out).
+  const vv = window.visualViewport;
+  if (vv) {
+    const fit = () => document.documentElement.style.setProperty("--vvh", `${vv.height}px`);
+    vv.addEventListener("resize", fit);
+    fit();
+  }
   const game = createCitySmash({ host, rooms: host.dataset.rooms });
   (window as unknown as { game: unknown }).game = game;
 </script>
