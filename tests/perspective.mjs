@@ -4,7 +4,7 @@
 // building. Here, in every city, on both edges of the two leftmost and the two rightmost buildings, at rest, mid-climb and at each of the seven punches' hit frames, at 1440, 390 portrait and 844
 // landscape, with two framings: the game's own follow camera (settled on him) and the camera as far over to
 // his side as the game's camera goes (him near the screen's edge, his side wall seen hardest: 167, where the
-// camera followed a point away from him; a zoomed browser scales the same picture): at least 90% of his torso
+// camera followed a point away from him; a zoomed browser scales the same picture): at least 93% of his torso
 // and head (the arms aside: the far arm may go behind the front corner) shows with every building drawn as
 // with none. Every failure is listed.
 import assert from "node:assert/strict";
@@ -17,7 +17,7 @@ const page = fixture.replace("</body>", `<script type="module">import { createCi
 const { CITIES } = await import("../src/cities.ts");
 const server = await serve(".", { "/": page });
 const browser = await chromium.launch(launchOptions());
-const LIMIT = 0.9, all = [];
+const LIMIT = 0.93, all = [];
 try {
   for (const [w, h] of JSON.parse(process.env.PERSP_VP || "[[1440, 900], [390, 844], [844, 390]]")) {
     const p = await browser.newPage({ viewport: { width: w, height: h } });
@@ -114,7 +114,7 @@ try {
     await p.close();
   }
   assert.deepEqual(all, [], `the held building never draws across his torso or head (${all.length} failures)`);
-  console.log("CitySmash: perspective green (on a wall at the screen's edges he hangs outside the corner: torso and head ≥ 90% in view).");
+  console.log("CitySmash: perspective green (on a wall at the screen's edges he hangs outside the corner: torso and head ≥ 93% in view).");
 } finally {
   await browser.close();
   await server.close();
