@@ -12,7 +12,7 @@
 import type { Diorama, DioramaObject } from "@fzlt/core/diorama";
 import { AIR, CLIMB, ROOF, KO, MK } from "./climber.ts";
 import { DEPTH } from "./block.ts";
-import { HERO, CRAB, BLOB, MOTH, PUNCH_CD, PUNCH_HIT } from "./round.ts";
+import { HERO, CRAB, BLOB, MOTH, PUNCH_CD, PUNCH_HIT, POWER_CD, POWER_HIT } from "./round.ts";
 
 /** The hero's fur, with the word its name takes. */
 export const FURS = [
@@ -344,7 +344,14 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
    *  frame's view of the side wall (./scene.ts wallFwd; render only, the run's state is untouched). */
   function pose(M: Float64Array, t: number, dt: number, spin?: number, fwd = 0) {
     const md = M[5]!, f = M[6]!, ph = M[13]!, ga = M[10]!, nom = M[18]!, squash = M[19]!, zap = M[23]!;
-    const wall = md === CLIMB, pt = PUNCH_CD - M[8]!, punching = M[8]! > 0 && zap <= 0;
+    // v12: the power punch (./round.ts POWER_*) runs the far punch's haymaker on its own, longer clock: its time is
+    // mapped onto the punch's (the wind-up onto the wind-up, the recovery onto the recovery); on a wall it is the
+    // far swing's motion itself (cell 3), on the street a cocked-back haymaker with the body coming in behind it.
+    const PW = M[52]! > 0, pp = POWER_CD - M[8]!;
+    const wall = md === CLIMB, pt = PW ? (pp < POWER_HIT ? (pp / POWER_HIT) * PUNCH_HIT : PUNCH_HIT + ((pp - POWER_HIT) / (POWER_CD - POWER_HIT)) * (PUNCH_CD - PUNCH_HIT)) : PUNCH_CD - M[8]!, punching = M[8]! > 0 && zap <= 0;
+    const cell = PW && wall ? 3 : M[38]!;
+    // (the street's power punch: back a little in the load, then the body lunges in at the hit and eases back)
+    const pl = PW && !wall && punching ? (M[34]! > 0 ? -0.3 * Math.min(1, pt / PUNCH_HIT) : 0.75 * (1 - Math.max(0, (pt - PUNCH_HIT) / (PUNCH_CD - PUNCH_HIT)) ** 2)) : 0;
     // On the street: three quarters to the camera. On a wall: side-on, chest to the wall.
     const want = wall ? (f > 0 ? W.yaw : Math.PI - W.yaw) : f > 0 ? -0.35 : Math.PI + 0.35;
     let dy = want - yaw;
@@ -358,8 +365,8 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     // front, forward, a roll that shows the camera its face): half-way in by the end of the wind-up (head leading,
     // drawn in front of the facade from a third of the way), at the hit its shoulder and head come past the corner
     // over the front face, back on the recovery.
-    const lk = wall && punching && M[38]! === 3 ? (M[34]! > 0 ? Math.min(1, pt / PUNCH_HIT) * 0.8 : 1 - (Math.max(0, (pt - PUNCH_HIT) / (PUNCH_CD - PUNCH_HIT) - 0.3) / 0.7) ** 2) : 0;
-    root.pos[0] = M[0]! + (wall ? f * (W.ox + W.lunge * lk) : 0);
+    const lk = wall && punching && cell === 3 ? (M[34]! > 0 ? Math.min(1, pt / PUNCH_HIT) * 0.8 : 1 - (Math.max(0, (pt - PUNCH_HIT) / (PUNCH_CD - PUNCH_HIT) - 0.3) / 0.7) ** 2) : 0;
+    root.pos[0] = M[0]! + (wall ? f * (W.ox + W.lunge * lk) : f * pl * MK);
     root.pos[1] = M[1]! + (wall ? (moving ? lift * 0.16 : br * 0.03) * MK : 0);
     // (forward only as far as keeps its feet and far hand on the side wall: the root no nearer than FWD_Z)
     root.pos[2] = M[2]! + (wall ? W.oz + Math.min(fwd, Math.max(0, FWD_Z - M[2]! - W.oz)) + W.come[0]! * lk : 0);
@@ -417,16 +424,18 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
       if (punching && outside) {
         // On a wall, one motion per reach cell (./round.ts REACH): a jab close, a hook to the middle, a full
         // swing far, and the up and down ones; each lands the fist in its window.
-        const d = M[32]!, j = (M[38]! > 0 ? M[38]! - 1 : d > 0 ? 3 : d < 0 ? 5 : 0) * 3;
+        const d = M[32]!, j = (cell > 0 ? cell - 1 : d > 0 ? 3 : d < 0 ? 5 : 0) * 3;
         // On a wall the hit and the wind-up come from the table; on the street, a slam by the direction.
-        const wr = wall ? W.wind[j]! : d > 0 ? 3.3 : d < 0 ? 1.45 : 0.6, ws = wall ? s * W.wind[j + 1]! : sp, we = wall ? W.wind[j + 2]! : d > 0 ? 1.3 : d < 0 ? 1.1 : 1.7;
-        const hr = wall ? W.hit[j]! : d > 0 ? 2.55 : d < 0 ? 0.8 : 1.6, hs = wall ? s * W.hit[j + 1]! : sp, he = wall ? W.hit[j + 2]! : d !== 0 ? 0.15 : 0;
+        const st = PW && !wall;
+        // (the tank's smash, d < 0: the fist up over the head, then slammed down at it)
+        const wr = wall ? W.wind[j]! : st ? (d < 0 ? 3.3 : -0.75) : d > 0 ? 3.3 : d < 0 ? 1.45 : 0.6, ws = wall ? s * W.wind[j + 1]! : sp, we = wall ? W.wind[j + 2]! : st ? (d < 0 ? 1.4 : 2.4) : d > 0 ? 1.3 : d < 0 ? 1.1 : 1.7;
+        const hr = wall ? W.hit[j]! : st ? (d < 0 ? 0.7 : 1.7) : d > 0 ? 2.55 : d < 0 ? 0.8 : 1.6, hs = wall ? s * W.hit[j + 1]! : sp, he = wall ? W.hit[j + 2]! : st ? 0.05 : d !== 0 ? 0.15 : 0;
         // (The round's hit frame is when its countdown M[34] runs out: until then the wind-up.)
         if (M[34]! > 0) {
           // The far swing's haymaker load eases out: cocked back early (upper arm behind the shoulder, fist up by the
           // ear on the far side from the window), held into the hit.
           let k = Math.min(1, pt / PUNCH_HIT);
-          if (wall && j === 6) k *= 2 - k;
+          if ((wall && j === 6) || st) k *= 2 - k;
           (r += (wr - r) * k), (sp += (ws - sp) * k), (er += (we - er) * k);
         } else {
           const k = Math.max(0, (pt - PUNCH_HIT) / (PUNCH_CD - PUNCH_HIT) - 0.3) / 0.7;

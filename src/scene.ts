@@ -22,6 +22,7 @@ import {
   createRun, NM, NS, NP, NCH, NH, NT, SEATS, AI, HERO, CRAB, IN, READY, RUN, CLEAR, DONE, CLIMB, ROOF, KO,
   E_START, E_HOLE, E_SHAKE, E_FLOOR, E_FLAT, E_HELI, E_HELI_CRASH, E_NOM, E_HURT, E_FLING, E_DROP, E_KO, E_END, E_STOMP, E_JUMP, E_LAND, E_CLIMB,
   E_SHOCK, E_TANK, E_BONK, E_BURN, E_JOIN, E_CHIP_, E_CRACK_, E_ARMOUR, E_TRAIN, E_BELLS, E_RAM, E_TRUCK, E_SURGE, E_CITY, E_CLEAR, E_PUNCH,
+  E_POWER, E_KNOCKOFF, E_POUNCE, E_COMBO_HIT, E_TELL, T_RIVAL, T_RIVAL_END, DUMMY, T_TANK, TANK_HITS, TANK_ARMOUR, T_FOE, T_TRUCK, T_GROUND_END,
   NI, NR, NG, P_ALL, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
   type Run,
 } from "./round.ts";
@@ -30,7 +31,7 @@ import { buildMonster, monName, shade, WALL, TRIMS, HELD, type Look, type Monste
 
 const TAU = 6.283185307179586;
 /** Practice's steps, in ./round.ts P_* order. */
-const PRACTICE = ["Walk", "Jump onto a building's side", "Climb it", "Punch all 7 reach cells", "Grab someone at a window", "Swat the parked helicopter", "Punch past a live (sparking) window"];
+const PRACTICE = ["Walk", "Jump onto a building's side", "Climb it", "Punch all 7 reach cells", "Grab someone at a window", "Swat the parked helicopter", "Punch past a live (sparking) window", "Power punch the sparring dummy (tap it)", "Pounce on the dummy (jump onto it)"];
 const mix = (a: string, b: string, k: number) => {
   const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), f = (s: number) => Math.round(((x >> s) & 255) * (1 - k) + ((y >> s) & 255) * k).toString(16).padStart(2, "0");
   return "#" + f(16) + f(8) + f(0);
@@ -78,10 +79,10 @@ function palette(c: City, light: boolean) {
   };
 }
 type Pal = ReturnType<typeof palette>;
-const WORDS = ["CRUNCH!", "KRAK!", "SMASH!", "TIMBER!", "FLAT!", "SWAT!", "KA-BLAM!", "NOM!", "BOINK!", "STOMP!", "OOF!", "ZZAP!", "BONK!", "KER-THOOM!", "OUCH! HOT!", "POOF!", "CLANG!", "DERAILED!", "WHAM!", "+100", "+250"];
+const WORDS = ["CRUNCH!", "KRAK!", "SMASH!", "TIMBER!", "FLAT!", "SWAT!", "KA-BLAM!", "NOM!", "BOINK!", "STOMP!", "OOF!", "ZZAP!", "BONK!", "KER-THOOM!", "OUCH! HOT!", "POOF!", "CLANG!", "DERAILED!", "WHAM!", "+100", "+250", "BOOM!", "KNOCKED OFF!", "POUNCE!", "COMBO!", "!", "KRUNCH!"];
 /** The most the rig on a wall comes forward for a side wall seen edge-on (./scene.ts wallFwd). */
 const WALL_FWD = 0.45;
-const W_CRUNCH = 0, W_TIMBER = 3, W_FLAT = 4, W_SWAT = 5, W_BLAM = 6, W_NOM = 7, W_BOINK = 8, W_STOMP = 9, W_OOF = 10, W_ZAP = 11, W_BONK = 12, W_THOOM = 13, W_HOT = 14, W_POOF = 15, W_CLANG = 16, W_DERAIL = 17, W_WHAM = 18, W_P100 = 19, W_P250 = 20;
+const W_CRUNCH = 0, W_TIMBER = 3, W_FLAT = 4, W_SWAT = 5, W_BLAM = 6, W_NOM = 7, W_BOINK = 8, W_STOMP = 9, W_OOF = 10, W_ZAP = 11, W_BONK = 12, W_THOOM = 13, W_HOT = 14, W_POOF = 15, W_CLANG = 16, W_DERAIL = 17, W_WHAM = 18, W_P100 = 19, W_P250 = 20, W_BOOM = 21, W_KNOCK = 22, W_POUNCE = 23, W_COMBO = 24, W_TELL = 25, W_KRUNCH = 26;
 const TOD = ["DAY", "DUSK", "NIGHT"];
 /** Bits of facade knocked off: they fall to the street and stay there as rubble (until the city changes). */
 const BITS = 180;
@@ -467,7 +468,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   // the hit-stop (frames; on one screen only: online the run never waits) and the camera's nudge (px).
   const SCAR: string[] = [], DENT: string[] = [];
   const LEAN = new Float64Array(16 * 2), BIT = new Float64Array(BITS * 9), FLASH = new Float64Array(4);
-  let nBits = 0, stopF = 0, nudge = 0;
+  let nBits = 0, stopF = 0, nudge = 0, stops = 0;
 
   // ---- state ----
   const INP = new Float64Array(SEATS * NI), I1 = new Float64Array(NI), OWN = new Float64Array(10).fill(-1, 0, 1), tmp = new Float64Array(3), tmp2 = new Float64Array(3), TQ = new Float64Array(4), DASH = [3, 4], NODASH: number[] = [];
@@ -745,7 +746,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   function heavy(x: number, y: number, size: number, k: number) {
     FLASH[0] = x; FLASH[1] = y; FLASH[2] = 0.3; FLASH[3] = 0.1 * size * calm;
     if (!mine(k)) return;
-    if (!net && calm) stopF = 3;
+    if (!net && calm) (stopF = 3), stops++;
     const O = MV[k]!;
     nudge = (O[5] === CLIMB ? O[6]! : 1) * 7 * size * calm;
   }
@@ -884,7 +885,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       } else if (type === E_HELI_CRASH || type === E_TANK || type === E_TRAIN || type === E_TRUCK) {
         engine.events.emit(type === E_HELI_CRASH ? "crash" : "tank");
         const z = type === E_TANK ? run.TK[7]! : type === E_TRAIN ? run.FE[4]! : type === E_TRUCK ? STREET0 + 3.5 : 2.6;
-        if (at(val, 0.6, z)) fx.blast(tmp[0]!, tmp[1]!, 1.3, 2), fx.word(tmp[0]!, tmp[1]! - 40, type === E_TANK ? W_THOOM : type === E_TRAIN ? W_DERAIL : type === E_TRUCK ? W_WHAM : W_BLAM, 2, 26);
+        if (at(val, 0.6, z)) fx.blast(tmp[0]!, tmp[1]!, 1.3, 2), fx.word(tmp[0]!, tmp[1]! - 40, type === E_TANK ? W_KRUNCH : type === E_TRAIN ? W_DERAIL : type === E_TRUCK ? W_WHAM : W_BLAM, 2, 26);
         W.dust.ring(rnd, val, 0.3, z, 18, 3.5, 1.8, 1.2, 0.45, 0.6);
         W.burst(rnd, val, 0.8, z, 3, type === E_TANK ? P.army : type === E_TRAIN ? P.train : type === E_TRUCK ? P.truck : P.heli);
         for (let n = 0; n < 10; n++) W.smoke.puff(val + (rnd() - 0.5) * 1.5, 0.6 + rnd(), z, (rnd() - 0.5) * 1.5, 1.5 + rnd() * 1.5, 0, 1.6, 0.4, 0.6);
@@ -930,6 +931,41 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         for (let n = 0; n < 16; n++) W.spark.puff(tmp2[0]!, tmp2[1]!, 0.3, (rnd() - 0.5) * 8, (rnd() - 0.4) * 7, 1 + rnd() * 2, 0.4, 0.06, 1);
         if (at(tmp2[0]!, tmp2[1]!, 0.3)) fx.word(tmp[0]!, tmp[1]! - 18, W_ZAP, 1, 22);
         if (mine(by)) toast("ZAPPED! LIVE WIRE", "bad"), say("Shocked: a live part");
+      } else if (type === E_POWER) {
+        // v12: the power punch lands: BOOM!, a blast at its chest, a shake; the hit-stop on one screen only (never online).
+        engine.events.emit("bonk");
+        const O = MV[val | 0]!;
+        fights[0]!++;
+        if (at(O[0]!, O[1]! + 1.9, O[2]!)) fx.word(tmp[0]!, tmp[1]! - 24, W_BOOM, 4, 30), fx.blast(tmp[0]!, tmp[1]!, 0.6, 3);
+        W.dust.ring(rnd, O[0]!, 0.3, O[2]!, 10, 2.6, 0.9, 0.8, 0.35, 0.55);
+        shake = Math.max(shake, 0.45);
+        if (!net && calm && (mine(by) || mine(val))) (stopF = 5), stops++;
+        if (mine(val)) toast("POWER PUNCHED!", "bad");
+        else if (mine(by)) say(`Power punch: ${who(val)} hit`);
+      } else if (type === E_COMBO_HIT) {
+        const O = MV[val | 0]!;
+        if (at(O[0]!, O[1]! + 1.9, O[2]!)) fx.word(tmp[0]!, tmp[1]! - 56, W_COMBO, 5, 20);
+        if (mine(by)) toast("COMBO! STUNNED +12", "clean");
+      } else if (type === E_KNOCKOFF) {
+        const O = MV[val | 0]!;
+        fights[1]!++;
+        if (at(O[0]!, O[1]! + mons[val | 0]!.height + 0.4, O[2]!)) fx.word(tmp[0]!, tmp[1]! - 10, W_KNOCK, 2, 22);
+        if (mine(val)) toast("KNOCKED OFF THE WALL!", "bad");
+        else say(`${who(val)} knocked off the wall`);
+      } else if (type === E_POUNCE) {
+        engine.events.emit("bonk");
+        const O = MV[val | 0]!;
+        fights[2]!++;
+        if (at(O[0]!, O[1]! + mons[val | 0]!.height, O[2]!)) fx.word(tmp[0]!, tmp[1]! - 14, W_POUNCE, 3, 24), fx.blast(tmp[0]!, tmp[1]!, 0.35, 3);
+        shake = Math.max(shake, 0.3);
+        if (!net && calm && (mine(by) || mine(val))) (stopF = 3), stops++;
+        if (mine(val)) toast("POUNCED! STUNNED", "bad");
+        else if (mine(by)) toast("POUNCE! NOW POWER PUNCH IT", "clean"), say(`Pounce: ${who(val)} is stunned, tap it for a combo`);
+      } else if (type === E_TELL) {
+        // An AI rival crouches for a pounce: a warning over it (move or jump clear).
+        const O = MV[by | 0]!;
+        if (at(O[0]!, O[1]! + mons[by | 0]!.height + 0.5, O[2]!)) fx.word(tmp[0]!, tmp[1]! - 6, W_TELL, 2, 26);
+        if (mine(val)) say(`${who(by)} is about to pounce: move`);
       } else if (type === E_BONK) {
         engine.events.emit("bonk");
         const O = MV[val | 0]!;
@@ -1000,7 +1036,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       chip.classList.toggle("cs-p", d !== AI);
       chip.classList.toggle("cs-out", O[24] !== IN || !!O[29]);
       chip.style.setProperty("--seat", d !== AI ? SEAT_C[d]! : "transparent");
-      (chip.children[0] as HTMLElement).textContent = d !== AI ? (net && d === net.seat ? "YOU" : "P" + (d + 1)) : O[24] === IN && !O[29] ? "CPU" : "OUT";
+      (chip.children[0] as HTMLElement).textContent = d !== AI ? (net && d === net.seat ? "YOU" : "P" + (d + 1)) : S[28] && k === DUMMY ? "DUMMY" : O[24] === IN && !O[29] ? "CPU" : "OUT";
       (chip.children[1] as HTMLElement).textContent = who(k);
       (chip.querySelector("s") as HTMLElement).style.width = `${Math.round(O[7]!)}%`;
       chip.classList.toggle("cs-low", O[7]! <= 30);
@@ -1567,6 +1603,57 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       ctx.fillText(t, tmp[0]!, tmp[1]! - 5);
     }
   }
+  /** v12: while a fight is on, a small health bar over each monster in it (not your own: yours is in the HUD), and
+   *  stars round a stunned one's head (still with reduced motion). */
+  function paintFight(ctx: CanvasRenderingContext2D) {
+    if (so.attract) return;
+    const me = MV.indexOf(own()), TK = run.TK;
+    // The tank's hits left once it has taken one: a pip each (filled), over it.
+    const tn = S[16]! >= TANK_ARMOUR ? TANK_HITS + 1 : TANK_HITS;
+    if (TK[0] === 1 && TK[9]! < tn && at(TK[1]!, 2.2, TK[7]!)) {
+      const n = tn, r = Math.max(4, Math.min(6, dio.width / 180));
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = P.ink;
+      for (let q = 0; q < n; q++) {
+        ctx.fillStyle = q < TK[9]! ? P.pickHit : P.ink;
+        ctx.beginPath();
+        ctx.arc(tmp[0]! + (q - (n - 1) / 2) * r * 2.8, tmp[1]!, r, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    for (let k = 0; k < NM; k++) {
+      const O = MV[k]!, m = mons[k]!;
+      if (O[24] !== IN || O[5] === KO || m.root.alpha <= 0 || !at(m.root.pos[0]!, O[1]! + m.height + 0.35, O[2]!)) continue;
+      const x = tmp[0]!, y = tmp[1]!;
+      if (O[54]! > 0 && k !== me) {
+        const w = Math.max(34, Math.min(56, dio.width / 26)), h = 6, v = O[7]! / 100;
+        ctx.globalAlpha = Math.min(1, O[54]! * 2);
+        ctx.fillStyle = P.ink;
+        ctx.fillRect(x - w / 2 - 2, y - h - 2, w + 4, h + 4);
+        ctx.fillStyle = v > 0.3 ? P.pickGrab : P.pickFar;
+        ctx.fillRect(x - w / 2, y - h, w * v, h);
+        ctx.globalAlpha = 1;
+      }
+      if (O[53]! > 0) {
+        ctx.fillStyle = "#ffd166";
+        ctx.strokeStyle = P.ink;
+        ctx.lineWidth = 1.5;
+        const r = Math.max(5, Math.min(8, dio.width / 140)), a0 = calm ? engine.time * 5 : 0;
+        for (let n = 0; n < 3; n++) {
+          const a = a0 + (n * TAU) / 3, cx = x + Math.cos(a) * r * 3, cy = y + 14 + Math.sin(a) * r;
+          ctx.beginPath();
+          for (let q = 0; q < 10; q++) {
+            const b = (q / 10) * TAU - TAU / 4, rr = q & 1 ? r * 0.45 : r;
+            q ? ctx.lineTo(cx + Math.cos(b) * rr, cy + Math.sin(b) * rr) : ctx.moveTo(cx + Math.cos(b) * rr, cy + Math.sin(b) * rr);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+    }
+  }
   function drawOverlay(ctx: CanvasRenderingContext2D) {
     // The reach and the pick over the finished frame (in the ground's decal they were under the facades).
     paintReach(ctx);
@@ -1607,6 +1694,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       ctx.globalAlpha = 1;
     }
     paintTags(ctx);
+    paintFight(ctx);
     if (flash > 0 && calm) {
       ctx.globalAlpha = flash * 1.4;
       ctx.fillStyle = P.zap;
@@ -1618,6 +1706,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   // ---- taps and clicks: the target, the reach outline ----
   /** A tap waiting for the next input read: 1 a punch, 2 a grab, and its target; the cell lit by it, the
    *  mouse's cell, a miss's ring. */
+  /** v12: fight pops shown so far (tests): BOOM!, KNOCKED OFF!, POUNCE!; the wall's grab outline's time left, and where it last was. */
+  const fights = [0, 0, 0];
+  let wallShow = 0, wallKey = -1;
   let tapK = 0, tapT = 0, tapF = 0, hoverC = -1, hoverG = false, hoverT = 0, missF = 0, missX = 0, missY = 0, pops = 0, hint = "", tapFace = 0;
   /** This screen's own monster (online its seat's, else seat one's). */
   function own() {
@@ -1669,12 +1760,24 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       return ok;
     };
     for (let h = 0; h < NH; h++) if (HE[h * 12] === 1 && near(HE[h * 12 + 1]!, HE[h * 12 + 2]!, HE[h * 12 + 3]!, 1.4)) return inBoth(HE[h * 12 + 1]!, HE[h * 12 + 2]!, true) ? T_HELI + h : T_MISS;
+    // v12: the tank (the gunboat): a smash from the punching shoulder; out of reach TOO FAR.
+    const TK = run.TK;
+    if (TK[0] === 1 && near(TK[1]!, 0.8, TK[7]!, 1.5)) return run.tankReach(O) && O[5] !== ROOF ? T_TANK : T_MISS;
     for (let k = 0; k < NCH; k++) if (CH[k * 9]! > 0 && !CH[k * 9 + 7] && near(CH[k * 9 + 1]!, CH[k * 9 + 2]!, CH[k * 9 + 3]!, 0.8)) return inBoth(CH[k * 9 + 1]!, CH[k * 9 + 2]!) ? T_CHUTE + k : T_MISS;
-    for (let k = 0; k < NS; k++) if (SO[k * 8]! > 0 && near(SO[k * 8 + 1]!, 0.8, SO[k * 8 + 2]!, 0.8)) return inBoth(SO[k * 8 + 1]!, 0.8) ? T_SOLDIER + k : T_MISS;
+    // A soldier: in the grab's fan a grab (he eats it); else in the ground's reach a smash; else TOO FAR. A truck: a smash.
+    for (let k = 0; k < NS; k++) if (SO[k * 8]! > 0 && near(SO[k * 8 + 1]!, 0.8, SO[k * 8 + 2]!, 0.8)) return inBoth(SO[k * 8 + 1]!, 0.8) ? T_SOLDIER + k : run.groundReach(O, SO[k * 8 + 1]!) ? T_FOE + k : T_MISS;
+    for (let k = 0; k < NT; k++) if (run.TR[k * 6] === 1 && near(run.TR[k * 6 + 1]!, 0.8, run.TR[k * 6 + 4]!, 1.4)) return run.groundReach(O, run.TR[k * 6 + 1]!) ? T_TRUCK + k : T_MISS;
     const k = cellAt(O, x, y);
     if (k >= 0) {
       const i = run.reachCell(O, k), o = run.occ[i]!;
       return o && run.cell[i] !== HOLE ? T_GRAB + k : T_CELL + k;
+    }
+    // v12: another monster (a rival, another player): the power punch at it, from the punching shoulder; out of reach TOO FAR.
+    const me = MV.indexOf(O);
+    for (let j = 0; j < NM; j++) {
+      const R = MV[j]!;
+      if (j === me || R[24] !== IN || R[5] === KO || mons[j]!.root.alpha <= 0) continue;
+      if (near(R[0]!, R[1]! + mons[j]!.height * 0.5, R[2]!, mons[j]!.height * 0.42)) return run.powerReach(O, j) ? T_RIVAL + j : T_MISS;
     }
     // Someone at a window in the grab's reach (on a wall: above, below, across; off it: the front fan, then
     // the one behind him).
@@ -1744,13 +1847,16 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     // The grab's reach (from the facing hand: in front, above, below), only where it helps: while the mouse
     // is on something to grab, or for a moment after a grab tap or a miss (a phone has no hover). Over the
     // finished frame; a cell the monster's own body covers on screen is skipped (it can't be told apart).
-    if ((hoverG || (tapF > 0 && pickKind(tapT) === 2) || missF > 0) && O[24] === IN && O[5] !== KO && !so.attract) {
+    // v12: on a wall it also shows for a moment each time he lands on one or climbs to a new floor (a phone has no
+    // hover: the range without tapping), faint, fading out (reduced motion: steady, then gone).
+    const wallOnly = !(hoverG || (tapF > 0 && pickKind(tapT) === 2) || missF > 0) && wallShow > 0 && O[5] === CLIMB;
+    if ((hoverG || (tapF > 0 && pickKind(tapT) === 2) || missF > 0 || (wallShow > 0 && O[5] === CLIMB)) && O[24] === IN && O[5] !== KO && !so.attract) {
       const tor = mons[MV.indexOf(O)]!.tor.M;
       const onT = dio.project(tor[9]!, tor[10]!, tor[11]!, tmp2), tx = tmp2[0]!, ty = tmp2[1]!, tr = onT ? (dio.focal() * 0.9) / tmp2[2]! : 0;
       ctx.setLineDash(DASH);
       ctx.strokeStyle = P.pickGrab;
       ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = wallOnly ? 0.4 * (calm ? Math.min(1, wallShow / 0.4) : 1) : 0.55;
       // (the side it is about to turn to, for something behind it)
       const bk = (t: number) => t >= T_BACK && t < T_BACK + NG, flipR = (hoverG && bk(hoverT)) || (tapF > 0 && bk(tapT) && O[6] === tapFace);
       for (let g = 0, n = run.grabCount(O); g < n; g++) {
@@ -1826,6 +1932,13 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       const q = t < T_CHUTE ? (t - T_HELI) * 12 : t < T_SOLDIER ? (t - T_CHUTE) * 9 : (t - T_SOLDIER) * 8;
       const on = t < T_CHUTE ? H[q] === 1 && dio.project(H[q + 1]!, H[q + 2]!, H[q + 3]!, tmp) : t < T_SOLDIER ? C[q]! > 0 && dio.project(C[q + 1]!, C[q + 2]! + 0.3, C[q + 3]!, tmp) : So[q]! > 0 && dio.project(So[q + 1]!, 0.5, So[q + 2]!, tmp);
       if (on) (rr = Math.max(14, (dio.focal() * (t < T_CHUTE ? 1.3 : 0.6)) / tmp[2]!)), (x = tmp[0]!), (y = tmp[1]!);
+    } else if (t >= T_TANK && t < T_GROUND_END) {
+      const So = run.SO, Tr = run.TR, tk = t === T_TANK, fo = t < T_TRUCK, q = tk ? 0 : fo ? (t - T_FOE) * 8 : (t - T_TRUCK) * 6;
+      const on = tk ? run.TK[0] === 1 && dio.project(run.TK[1]!, 0.8, run.TK[7]!, tmp) : fo ? So[q]! > 0 && dio.project(So[q + 1]!, 0.5, So[q + 2]!, tmp) : Tr[q] === 1 && dio.project(Tr[q + 1]!, 0.8, Tr[q + 4]!, tmp);
+      if (on) (rr = Math.max(14, (dio.focal() * (fo && !tk ? 0.6 : 1.5)) / tmp[2]!)), (x = tmp[0]!), (y = tmp[1]!);
+    } else if (t >= T_RIVAL && t < T_RIVAL_END) {
+      const R = MV[t - T_RIVAL]!, m = mons[t - T_RIVAL]!;
+      if (dio.project(R[0]!, R[1]! + m.height * 0.5, R[2]!, tmp)) (rr = Math.max(18, (dio.focal() * m.height * 0.45) / tmp[2]!)), (x = tmp[0]!), (y = tmp[1]!);
     } else if (t === T_MISS) rr = 12;
     if (!ok && !rr) return;
     const pulse = calm && a === 1 ? 0.08 * Math.sin(engine.time * 14) : 0;
@@ -1932,6 +2045,11 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       if (stepCam(dt)) moving = true;
       if (shake > 0) (shake = Math.max(0, shake - dt)), (moving = true);
       if (toastT > 0) (toastT = Math.max(0, toastT - dt)), (moving = true), toastT === 0 && (toastEl.hidden = true);
+      {
+        const O = own(), key = O[5] === CLIMB && O[24] === IN ? O[12]! * 1000 + run.levelRow(O) * 2 + (O[22]! > 0 ? 1 : 0) : -1;
+        if (key !== wallKey) (wallKey = key), key >= 0 && !so.attract && (wallShow = 1.5);
+        if (wallShow > 0) (wallShow = Math.max(0, wallShow - dt)), (moving = true);
+      }
       if (tapF > 0 || missF > 0) {
         // The pick stays lit until its action lands (the punch's hit frame, the grab's reach), then fades.
         const O = own(), waiting = tapK !== 0 || O[43] === tapT || O[44] === tapT || O[49]! > 0 || O[34]! > 0 || O[10]! > 0.55;
@@ -2028,7 +2146,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     },
     /** v11: pops shown for grabs and swats so far, and the last TOO FAR's hint (tests). */
     get feedback() {
-      return { pops, hint, miss: missF > 0, tap: tapT };
+      return { pops, hint, miss: missF > 0, tap: tapT, boom: fights[0], knocked: fights[1], pounced: fights[2], wallShow, stops };
     },
     /** What a tap at canvas point (x, y) would do (a target code, ./round.ts T_*). */
     tapAt,

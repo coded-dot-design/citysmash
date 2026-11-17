@@ -22,7 +22,7 @@ try {
       const sc = game.scene, r = sc.run, root = document.querySelector("[data-fizlet-host]").shadowRoot;
       sc.engine.stop();
       const step = (n) => { for (let i = 0; i < n; i++) sc.engine.advance(1 / 60); };
-      const M = r.MV[0], out = { practice: sc.practice, rivals: r.MV.slice(1).some((O) => O[24] !== 0) };
+      const M = r.MV[0], out = { practice: sc.practice, rivals: r.MV.slice(2).some((O) => O[24] !== 0), dummy: r.MV[1][24] === 1 && r.MV[1][28] === 9 };
       // A minute on the autopilot: no health lost, no end.
       sc.auto = true;
       let lo = 100, done = false;
@@ -48,11 +48,30 @@ try {
       out.reach = r.S[30]; out.steps = r.S[29];
       out.ticked = root.querySelectorAll(".cs-prac li.cs-done").length;
       out.card = !root.querySelector(".cs-prac").hidden;
+      // v12: the sparring dummy: a power punch at it (a tap), then a pounce onto it; it never fights back or runs out.
+      const D = r.MV[1], st = (O, x, f) => { O[5] = 0; O[0] = x; O[1] = 0; O[2] = 1.9; O[3] = O[4] = 0; O[6] = f; O[8] = O[34] = O[45] = O[15] = O[53] = 0; O[12] = -1; };
+      st(D, -2, -1); st(M, -4.4, 1); step(2);
+      const cv = root.querySelector("canvas"), [px, py] = sc.project(D[0], D[1] + sc.rig(1).height * 0.5, D[2]);
+      out.tapT = sc.tapAt(px, py);
+      M[20] = 0.3; M[43] = out.tapT; step(40);
+      out.power = (r.S[29] & 128) > 0;
+      const cx = r.BLD[4] + r.BLD[5] / 2; st(D, cx, -1); st(M, cx + 0.2, -1); M[5] = 1; M[1] = 3.3; M[4] = -3; step(3);
+      out.pounce = (r.S[29] & 256) > 0; out.stunned = D[53] > 0;
+      for (let i = 0; i < 12; i++) (st(M, D[0] - 2.2, 1), (M[20] = 0.3), (M[43] = 78 + 1), step(45));
+      out.dummyHp = D[7]; out.dummyIn = D[24] === 1 && D[5] !== 4;
+      out.dummyChip = root.querySelector(".cs-m1 i")?.textContent ?? "";
+      out.ticked2 = root.querySelectorAll(".cs-prac li").length;
+      void cv;
       sc.engine.start();
       return out;
     });
     const at = `${w}: practice`;
-    assert.ok(res.practice && !res.rivals, `${at}: a practice run, no rivals`);
+    assert.ok(res.practice && !res.rivals && res.dummy, `${at}: a practice run, no rivals but the sparring dummy`);
+    assert.equal(res.tapT, 79, `${at}: a tap on the dummy in reach is the power punch`);
+    assert.ok(res.power && res.pounce && res.stunned, `${at}: the power punch and the pounce steps tick off; the pounce stuns it`);
+    assert.ok(res.dummyHp >= 1 && res.dummyIn, `${at}: twelve power punches and the dummy is still in (${res.dummyHp})`);
+    assert.equal(res.dummyChip, "DUMMY", `${at}: its chip says DUMMY`);
+    assert.equal(res.ticked2, 9, `${at}: nine steps on the card`);
     assert.equal(res.lo, 100, `${at}: a minute on the autopilot loses no health`);
     assert.ok(!res.done, `${at}: it never ends`);
     assert.ok(res.shocked && res.hp === 100, `${at}: a live window shocks but takes no health (${res.hp})`);
@@ -63,7 +82,7 @@ try {
     assert.equal(await p.evaluate(() => JSON.stringify(game.profile)), before, `${at}: the profile is untouched`);
     await p.close();
   }
-  console.log("CitySmash: practice green (no health lost to a shock or a minute's play, it never ends, the seven-dot tracker fills, the steps tick off, the profile untouched; at 1440 and 390).");
+  console.log("CitySmash: practice green (no health lost to a shock or a minute's play, it never ends, the seven-dot tracker fills, the steps tick off, the sparring dummy takes a power punch and a pounce and never runs out, the profile untouched; at 1440 and 390).");
 } finally {
   await browser.close();
   await server.close();

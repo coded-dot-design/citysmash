@@ -65,6 +65,8 @@ try {
   const [ha, hb] = [await hashIn(A), await hashIn(B)];
   assert.equal(ha, hb, "byte for byte on the held frame");
   assert.deepEqual([await A.evaluate(() => game.net.desync), await B.evaluate(() => game.net.desync)], [-1, -1], "no desync");
+  // v12: the hit-stop is one screen only: online neither screen ever holds (the hits and the fights alike).
+  assert.deepEqual([await A.evaluate(() => game.scene.feedback.stops), await B.evaluate(() => game.scene.feedback.stops)], [0, 0], "no hit-stop online");
   const sa = await A.evaluate(() => game.scene.state);
   assert.ok(sa.holes > 0 || sa.score > 0, `they smashed (score ${sa.score})`);
   console.log(`✓ ${at} frames identical on both screens (score ${sa.score}, corrections ${await A.evaluate(() => game.net.corrections)} / ${await B.evaluate(() => game.net.corrections)})`);

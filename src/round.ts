@@ -21,9 +21,11 @@ export const READY = 0, RUN = 1, CLEAR = 2, DONE = 3;
 export const E_START = 1, E_PUNCH = 2, E_HOLE = 3, E_SHAKE = 4, E_FLOOR = 5, E_FLAT = 6, E_HELI = 7, E_HELI_CRASH = 8, E_NOM = 9,
   E_HURT = 10, E_FLING = 11, E_DROP = 12, E_KO = 13, E_END = 14, E_WHIFF = 15, E_SHOT = 16, E_STOMP = 17, E_JUMP = 18, E_LAND = 19, E_CLIMB = 20,
   E_SHOCK = 21, E_TANK = 22, E_BONK = 23, E_OUT = 24, E_BURN = 25, E_JOIN = 26, E_CHIP_ = E_CHIP, E_CRACK_ = E_CRACK, E_ARMOUR = 29, E_TRAIN = 30,
-  E_BELLS = 31, E_RAM = 32, E_TRUCK = 33, E_SURGE = 34, E_CITY = 35, E_CLEAR = 36;
+  E_BELLS = 31, E_RAM = 32, E_TRUCK = 33, E_SURGE = 34, E_CITY = 35, E_CLEAR = 36,
+  /** v12, the fight: a power punch lands on a rival (v: its monster), knocks one off a wall, a pounce, a combo on a stunned one, an AI's tell. */
+  E_POWER = 37, E_KNOCKOFF = 38, E_POUNCE = 39, E_COMBO_HIT = 40, E_TELL = 41;
 /** The monsters, in seat order online: the ape, then the rivals. */
-export const NM = 4, MW = 52, HERO = 0, CRAB = 1, BLOB = 2, MOTH = 3;
+export const NM = 4, MW = 58, HERO = 0, CRAB = 1, BLOB = 2, MOTH = 3;
 /** Who drives a monster: a seat 0..3, or the AI. */
 export const SEATS = 4, AI = 9;
 export const MAX_HP = 100, SHOCK_HP = 7;
@@ -36,7 +38,7 @@ export const PUNCH_CD = 0.24, PUNCH_HIT = 0.08;
 export const COMBO = [1, 1.25, 1.5, 1.6], COMBO_GAP = 0.6;
 /** A swing or a grab at something out of reach costs this much more before the next one (spam does not pay). */
 export const WHIFF_T = 0.2;
-const GRAB_CD = 0.4, CARD_T = 4.2;
+const GRAB_CD = 0.4, CARD_T = 4.2, FIGHT_T = 4;
 /** The autopilot's order through the reach: level close, medium, far, down close, medium, up close, medium. */
 const AI_ORDER = [0, 1, 2, 5, 6, 3, 4];
 /** Numbers per seat in IN: mx, my (−1..1, my up), punch, jump, grab (1 on the press), and a target (T_*). */
@@ -75,13 +77,36 @@ export const T_CELL = 1, T_GRAB = 8, T_HELI = 23, T_CHUTE = 25, T_SOLDIER = 45, 
  *  grabs); a window on the bottom floor from the street, j columns out from the hand (T_LOW + j; behind
  *  him T_LOW + 3 + j: he turns, then punches it). Still 7 bits. */
 export const T_BACK = 57, T_LOW = 72, NLOW = 3, T_TOP = 78;
+/** v12 (owner: "use the wind-up power punch on the enemies; he jumps on them and punches them"): a tap on another
+ *  monster in reach is the POWER PUNCH at it (T_RIVAL + its monster): the far punch's haymaker language, a longer
+ *  fixed wind-up (POWER_HIT: the body comes forward, the arm cocks back, then fires), POWER_HP and a knockback; a
+ *  rival on a wall or a roof is knocked off it. The reach is from the punching shoulder (POWER_R; behind him on the
+ *  street he turns in the wind-up). A jump that comes down on a rival's head or back is a POUNCE: POUNCE_HP and it
+ *  is stunned for STUN_T (no moves); a power punch on a stunned rival adds COMBO_HP (the combo). Still 7 bits. */
+export const T_RIVAL = 78, T_RIVAL_END = 82;
+/** v12 (owner: "I don't seem to be able to kill the tanks"): the tank (the gunboat on the harbour) was never a tap
+ *  target (it stands out on the street, in front of the grab cells a tap is matched against), so a tap on it was TOO
+ *  FAR. A tap on it in reach (from the punching shoulder: TANK_R) is a downward power smash (T_TANK; from a wall, a
+ *  down punch at one below); a jump onto it crushes it. It takes TANK_HITS hits (TANK_HITS + 1 from city TANK_ARMOUR). */
+export const T_TANK = 82, TANK_R = 4.2, TANK_HITS = 2, TANK_ARMOUR = 3;
+/** The street's enemies on the ground (the owner: "tapping a tank says TOO FAR, even when it looks close"): off a wall
+ *  the reach for them is a generous band along the ground in front of the punching shoulder (GROUND_R; at his feet
+ *  too; behind him he turns): the tank, a soldier to smash (T_FOE + s; in the grab's fan a tap still eats it), a
+ *  truck (T_TRUCK + t). */
+export const GROUND_R = 8, T_FOE = 83, T_TRUCK = 92, T_GROUND_END = 94;
+export const POWER_CD = 0.62, POWER_HIT = 0.36, POWER_HP = 16, COMBO_HP = 12, POWER_R = 3.6, SHOULDER_Y = 2.5;
+export const POUNCE_HP = 10, STUN_T = 1.4, POUNCE_LO = 1.1, POUNCE_HI = 3.8;
+/** The AI's moves: a power punch at most every AI_POWER s, a pounce after a crouch of POUNCE_TELL s (fixed: dodge it). */
+export const AI_POWER = 3.2, POUNCE_TELL = 0.4;
 /** Is target t a punch (else a grab)? */
-export const isPunch = (t: number) => (t >= T_CELL && t < T_GRAB) || (t >= T_HELI && t < T_CHUTE) || (t >= T_STREET && t <= T_MISS) || (t >= T_LOW && t < T_TOP);
+export const isPunch = (t: number) => (t >= T_CELL && t < T_GRAB) || (t >= T_HELI && t < T_CHUTE) || (t >= T_STREET && t <= T_MISS) || (t >= T_LOW && t < T_GROUND_END);
 
 /** Practice (S[28]): one player, no army (a parked helicopter that never fires), no health lost, flattened
  *  buildings come back; its steps (bits in S[29]): walk, onto a wall, climb, punch all seven reach cells
  *  (S[30], a bit a cell), eat someone, swat the helicopter, a punch past a live window. */
-export const P_WALK = 1, P_WALL = 2, P_CLIMB = 4, P_REACH = 8, P_NOM = 16, P_HELI = 32, P_LIVE = 64, P_ALL = 127;
+export const P_WALK = 1, P_WALL = 2, P_CLIMB = 4, P_REACH = 8, P_NOM = 16, P_HELI = 32, P_LIVE = 64, P_POWER = 128, P_POUNCE = 256, P_ALL = 511;
+/** v12: practice's sparring dummy (a harmless training rival: it never fights back, never runs out of health). */
+export const DUMMY = 1;
 /** A run. `step(dt, IN)`: IN holds NI numbers per seat (mx, my −1..1 with my up, punch, jump, grab: 1 on the press, a target). */
 export function createRun(seed = 20261116) {
   // The one random: an LCG in the state (so the rollback saves it with the rest).
@@ -91,8 +116,9 @@ export function createRun(seed = 20261116) {
    *  [8] floors down, [9] end delay, [10] best, [11] tanks, [12] shocks, [13] last hole, [14] last punch direction, [15] last nom's monster,
    *  [16] city, [17] card timer, [18] cities cleared this run, [19] run time, [20] won, [21] first city, [22] rivals on, [23] trains,
    *  [24] trucks, [25] surges, [26] city start score, [27] attract (no end: the next city loops), [28] practice (./PRACTICE),
-   *  [29] practice steps done (bits, ./P_*), [30] reach cells punched in practice (bits), [31] practice: a flat building's rebuild timer. */
-  const S = new Float64Array(32);
+   *  [29] practice steps done (bits, ./P_*), [30] reach cells punched in practice (bits), [31] practice: a flat building's rebuild timer,
+   *  [32] practice: the sparring dummy is in (1). */
+  const S = new Float64Array(34);
   /** Per monster (MW numbers each): [0] x, [1] y, [2] z, [3] vx, [4] vy, [5] mode, [6] face, [7] hp, [8] punch cooldown, [9] punch anim,
    *  [10] grab anim, [11] hurt, [12] on building, [13] walk phase, [14] grab cooldown, [15] invulnerable, [16] fist x, [17] fist y,
    *  [18] mouth, [19] land squash, [20] a punch pressed during the cooldown, [21] the same for a grab, [22] the side it hangs on,
@@ -104,7 +130,9 @@ export function createRun(seed = 20261116) {
    *  same for a grab, [45] a whiff's recovery left (no punch or grab till it runs out), [46] the combo (./COMBO; 0 or 1: none), [47] the time since
    *  its last action ended (the combo's gap), [48] time held down at the bottom of a wall (a drop-off
    *  needs a hold: the bottom floor stays in reach), [49] turning round for a grab behind (time left), [50] [51] where
-   *  the grab reaches to (x, y; 0: nowhere picked: the arm's own reach). */
+   *  the grab reaches to (x, y; 0: nowhere picked: the arm's own reach), [52] v12: the power punch's rival + 1 (0: none),
+   *  [53] stunned (time left: no moves), [54] fighting (time left: the health bar shows), [55] an AI pounce's crouch (time
+   *  left, then the jump), [56] a grab re-queued after a turn (it chained already: the combo counts it once), [57] spare. */
   const MS = new Float64Array(NM * MW), MV: Float64Array[] = [];
   for (let k = 0; k < NM; k++) MV.push(MS.subarray(k * MW, k * MW + MW)), (MV[k]![31] = k);
   let M = MV[0]!, cur = 0;
@@ -178,12 +206,12 @@ export function createRun(seed = 20261116) {
   const city = () => CITIES[S[16]!]!;
 
   const run = {
-    S, M: MV[0]!, MV, SO, PB, CH, HE, TK, FE, TR, ev, n: 0, R, bk,
+    S, M: MV[0]!, MV, SO, PB, CH, HE, TK, FE, TR, AS, T, ev, n: 0, R, bk,
     cell, occ, B, BLD, C0, LIVE, ANT, crackT: bk.crackT, HIT: bk.HIT,
     /** Every view of the run's state: saved, restored and hashed byte for byte. */
     bytes: [] as Uint8Array[],
     reset, step, clear, autopilot, autopilotOwn, join, setCur, humans, loadCity, top, yOff, standing, wallX, rowOf, sideTarget, nb, city,
-    levelRow, reachCell, reachCount, inReach, grabCell, grabCount, inGrab, winAt, lowCell, GC,
+    levelRow, reachCell, reachCount, inReach, grabCell, grabCount, inGrab, winAt, lowCell, GC, powerReach, tankReach, groundReach,
     get SX() {
       return SXv();
     },
@@ -268,6 +296,8 @@ export function createRun(seed = 20261116) {
         O[24] = k !== HERO && ai < want ? WAIT : OUT;
         O[30] = 1.5 + ai * 9;
         if (O[24] === WAIT) ai++;
+        // Practice's sparring dummy: on the street a little way in front of the player, facing it.
+        if (S[28] && k === DUMMY) (O[24] = IN), (O[0] = -sx * 0.45 + 5.5), (O[6] = -1), (S[32] = 1);
       }
     }
     for (let k = 0; k < NM * 8; k++) AS[k] = 0;
@@ -469,6 +499,15 @@ export function createRun(seed = 20261116) {
     let c = -1;
     // A helicopter behind him (off a wall): he turns to it in the wind-up.
     if (t >= T_HELI && t < T_CHUTE && md !== CLIMB && targetAt(t) && (TG[0]! - M[0]!) * M[6]! < 0) M[6] = -M[6]!;
+    // v12: a rival tapped (the power punch): behind him off a wall, he turns to it in the wind-up; out of the
+    // shoulder's reach (or itself, or out of play) a whiff.
+    const pw = t >= T_RIVAL && t < T_RIVAL_END;
+    if (pw && t - T_RIVAL !== cur && md !== CLIMB && (MV[t - T_RIVAL]![0]! - M[0]!) * M[6]! < 0) M[6] = -M[6]!;
+    if (pw && (t - T_RIVAL === cur || !powerReach(M, t - T_RIVAL))) t = T_MISS;
+    const gr = t >= T_FOE && t < T_GROUND_END;
+    if ((t === T_TANK || gr) && md !== CLIMB && md !== ROOF && (groundX(t) - M[0]!) * M[6]! < 0) M[6] = -M[6]!;
+    if (t === T_TANK && !tankReach(M)) t = T_MISS;
+    if (gr && !(groundX(t) === groundX(t) && groundReach(M, groundX(t)))) t = T_MISS;
     // A tapped target out of reach (or gone) is a whiff.
     if ((t >= T_CELL && t < T_GRAB && reachCell(M, t - T_CELL) < 0) || (t >= T_HELI && t < T_CHUTE && (!targetAt(t) || !inGrab(M, TG[0]!, TG[1]!, true)))) t = T_MISS;
     if (t >= T_CELL && t < T_GRAB) c = t - T_CELL;
@@ -495,8 +534,11 @@ export function createRun(seed = 20261116) {
         }
       }
     }
-    const d = c >= 0 ? REACH[c * 2]! : md === ROOF && my < -0.4 ? -1 : 0;
-    M[8] = PUNCH_CD; M[9] = 1; M[34] = PUNCH_HIT; M[35] = d; M[32] = d; M[38] = c + 1; M[42] = t;
+    // (the tank: off a wall the power punch's clock, slammed down; from a wall the close down punch's motion)
+    if (t === T_TANK && md === CLIMB) c = 5;
+    const power = (t >= T_RIVAL && t < T_RIVAL_END) || (t === T_TANK && md !== CLIMB) || (t >= T_FOE && t < T_GROUND_END);
+    const d = t >= T_TANK && t < T_GROUND_END ? -1 : c >= 0 ? REACH[c * 2]! : md === ROOF && my < -0.4 ? -1 : 0;
+    M[8] = power ? POWER_CD : PUNCH_CD; M[9] = 1; M[34] = power ? POWER_HIT : PUNCH_HIT; M[35] = d; M[32] = d; M[38] = c + 1; M[42] = t; M[52] = power ? (t >= T_TANK ? NM + 1 : t - T_RIVAL + 1) : 0;
     S[14] = d;
     emit(E_PUNCH, d);
     return true;
@@ -515,6 +557,19 @@ export function createRun(seed = 20261116) {
     const fx = M[16]!, fy = M[17]!, md = M[5]!, d = M[35]!, t = M[42]!;
     // A swing at nothing in reach: a whiff.
     if (t === T_MISS) return void emit(E_WHIFF, 0);
+    if (t >= T_RIVAL && t < T_RIVAL_END) return powerLand(t - T_RIVAL);
+    if (t === T_TANK) return void (tankReach(M) ? (tankHit(), (M[54] = FIGHT_T)) : emit(E_WHIFF, 0));
+    if (t >= T_FOE && t < T_GROUND_END) {
+      const x = groundX(t);
+      if (!(x === x) || !groundReach(M, x)) return void emit(E_WHIFF, 0);
+      if (t >= T_TRUCK) return truckBust(t - T_TRUCK);
+      const o = (t - T_FOE) * 8;
+      SO[o] = 0;
+      chute(SO[o + 1]!, 0.6, SO[o + 2]!, 2, M[6]! * 3);
+      S[7]!++;
+      pts(50);
+      return void emit(E_FLING, t - T_FOE);
+    }
     // A helicopter first (a jump, a wall or a roof gets you up to it; a tapped one anywhere in reach).
     for (let h = 0; h < NH; h++) {
       const o = h * 12;
@@ -592,7 +647,7 @@ export function createRun(seed = 20261116) {
   }
   /** A punch on the tank: armour first (later cities), then it blows. */
   function tankHit() {
-    if (TK[9]! > 0) {
+    if (TK[9]! > 1) {
       TK[9]!--;
       TK[10] = 0.3;
       pts(60);
@@ -620,8 +675,9 @@ export function createRun(seed = 20261116) {
   /** Monster j takes a punch: health, and off whatever it hangs on. */
   function bonk(j: number) {
     const O = MV[j]!;
-    O[7] = Math.max(0, O[7]! - 6);
+    O[7] = Math.max(S[28] ? 1 : 0, O[7]! - 6);
     O[11] = 0.3;
+    O[54] = M[54] = FIGHT_T;
     if (O[5] === CLIMB || O[5] === ROOF) (O[5] = AIR), (O[12] = -1), (O[4] = 4), (O[3] = M[6]! * 5), (O[15] = 0.7);
     else O[3] = M[6]! * 3;
     pts(30);
@@ -631,6 +687,98 @@ export function createRun(seed = 20261116) {
       setCur(j);
       knockOut();
       setCur(k);
+    }
+  }
+  /** v12: is monster j in reach of monster O's power punch? From the punching shoulder (the side j is on: off a
+   *  wall he turns to it), to j's chest, POWER_R (the same at the hit frame: a step
+   *  or a jump clear in the wind-up is a dodge). Not itself, not out of play or shrunk. */
+  function powerReach(O: Float64Array, j: number, slack = 1) {
+    const R = MV[j]!;
+    if (R === O || R[24] !== IN || R[5] === KO) return false;
+    const f = R[0]! >= O[0]! ? 1 : -1, dx = R[0]! - (O[0]! + f * 0.55), dy = R[1]! + 1.7 - (O[1]! + (O[5] === CLIMB ? HAND + 0.5 : SHOULDER_Y)), r = POWER_R * slack;
+    return dx * dx + dy * dy < r * r;
+  }
+  /** v12: is the tank in reach of monster O's smash (from the punching shoulder, either side: off a wall he turns)? */
+  function tankReach(O: Float64Array) {
+    if (TK[0] !== 1 || O[5] === ROOF) return false;
+    if (O[5] !== CLIMB) return groundReach(O, TK[1]!);
+    const f = TK[1]! >= O[0]! ? 1 : -1, dx = TK[1]! - (O[0]! + f * 0.55), dy = 0.9 - (O[1]! + (O[5] === CLIMB ? HAND + 0.5 : SHOULDER_Y));
+    return dx * dx + dy * dy < TANK_R * TANK_R;
+  }
+  /** Off a wall, is ground x in the band in front of monster O's punching shoulder (either side: he turns)? */
+  function groundReach(O: Float64Array, x: number) {
+    if (O[5] === CLIMB || O[5] === ROOF || O[1]! > 3) return false;
+    const f = x >= O[0]! ? 1 : -1;
+    return (x - (O[0]! + f * 0.55)) * f < GROUND_R;
+  }
+  /** Where ground target t (a soldier, a truck) is, or NaN when it is gone. */
+  function groundX(t: number) {
+    if (t >= T_FOE && t < T_FOE + NS) return SO[(t - T_FOE) * 8]! > 0 ? SO[(t - T_FOE) * 8 + 1]! : NaN;
+    if (t >= T_TRUCK && t < T_TRUCK + NT) return TR[(t - T_TRUCK) * 6] === 1 ? TR[(t - T_TRUCK) * 6 + 1]! : NaN;
+    return TK[0] === 1 ? TK[1]! : NaN;
+  }
+  /** Monster j takes a hit in the fight: n health (the dummy never goes under 1), the health bars show. */
+  function fightHit(j: number, n: number) {
+    const O = MV[j]!;
+    O[7] = Math.max(S[28] ? 1 : 0, O[7]! - n);
+    O[11] = 0.35;
+    O[54] = M[54] = FIGHT_T;
+    // A stunned or hit monster drops what it was doing (an AI's crouch, a wind-up).
+    O[55] = O[57] = 0;
+  }
+  /** The power punch's hit frame: it lands if the rival is still in reach (moved or jumped clear: a whiff), with the
+   *  combo's bonus on a stunned one, a knockback, and off whatever wall or roof it is on. */
+  function powerLand(j: number) {
+    const O = MV[j]!;
+    if (!powerReach(M, j)) return void emit(E_WHIFF, 0);
+    const stun = O[53]! > 0, on = O[5] === CLIMB || O[5] === ROOF, dir = O[0]! >= M[0]! ? 1 : -1;
+    fightHit(j, POWER_HP + (stun ? COMBO_HP : 0));
+    O[53] = 0; O[8] = O[34] = O[52] = O[20] = O[21] = 0;
+    O[5] = AIR; O[12] = -1; O[4] = on ? 2.5 : 5; O[3] = dir * (on ? 6 : 8); O[15] = 0.6;
+    pts(stun ? 160 : 80);
+    if (S[28] && cur === 0) S[29] = S[29]! | P_POWER;
+    emit(E_POWER, j);
+    if (stun) emit(E_COMBO_HIT, j);
+    if (on) emit(E_KNOCKOFF, j);
+    if (O[7]! <= 0) {
+      const k = cur;
+      setCur(j);
+      knockOut();
+      setCur(k);
+    }
+  }
+  /** A jump coming down on another monster's head or back (in the air, falling, over it): a pounce. It is
+   *  stunned (STUN_T: no moves), loses POUNCE_HP, is knocked off a wall; the jumper bounces up off it. */
+  function pounce() {
+    if (M[5] !== AIR || M[4]! > -1 || M[15]! > 0) return;
+    // v12: onto the tank: crushed (not the gunboat: it is out on the water); onto a soldier: flung.
+    if (TK[0] === 1 && city().feature !== HARBOUR && Math.abs(TK[1]! - M[0]!) < 1.9 && M[1]! < 2.2) return void ((TK[9] = 0), tankHit(), (M[4] = 7));
+    if (M[1]! < 1.4)
+      for (let s = 0; s < NS; s++) {
+        const o = s * 8;
+        if (SO[o]! > 0 && Math.abs(SO[o + 1]! - M[0]!) < 1.3) (SO[o] = 0), chute(SO[o + 1]!, 0.5, SO[o + 2]!, 2, (SO[o + 1]! > M[0]! ? 1 : -1) * 3), S[7]!++, pts(50), emit(E_STOMP, s);
+      }
+    for (let j = 0; j < NM; j++) {
+      const O = MV[j]!;
+      if (j === cur || O[24] !== IN || O[5] === KO || O[53]! > 0 || Math.abs(O[0]! - M[0]!) > 1.3) continue;
+      const h = M[1]! - O[1]!;
+      if (h < POUNCE_LO || h > POUNCE_HI) continue;
+      const on = O[5] === CLIMB || O[5] === ROOF;
+      fightHit(j, POUNCE_HP);
+      O[53] = STUN_T; O[8] = O[34] = O[52] = O[20] = O[21] = 0;
+      if (on) (O[5] = AIR), (O[12] = -1), (O[4] = 0), (O[3] = 0), (O[15] = 0.6);
+      M[4] = 7; M[3] = M[6]! * 1.5;
+      pts(60);
+      if (S[28] && cur === 0) S[29] = S[29]! | P_POUNCE;
+      emit(E_POUNCE, j);
+      if (on) emit(E_KNOCKOFF, j);
+      if (O[7]! <= 0) {
+        const k = cur;
+        setCur(j);
+        knockOut();
+        setCur(k);
+      }
+      return;
     }
   }
   /** An action starts: a targeted one (a tap, a click: something picked in reach) soon after the last steps
@@ -658,6 +806,8 @@ export function createRun(seed = 20261116) {
       M[14] = TURN_T;
       M[21] = TURN_T + 0.3;
       M[44] = t >= T_BACK && t < T_BACK + NG ? t - T_BACK + T_GRAB : t;
+      // (a parachute or a soldier behind chained the combo on this press already: not again when it fires)
+      M[56] = t >= T_BACK && t < T_BACK + NG ? 0 : 1;
       return true;
     }
     M[50] = M[51] = 0;
@@ -848,7 +998,7 @@ export function createRun(seed = 20261116) {
       TK[4]! -= dt;
       if (TK[4]! <= 0) {
         const side = mx > 0 ? -1 : 1;
-        TK[0] = 1; TK[1] = side * (sx + 2); TK[2] = -side; TK[3] = 2.5; TK[6] = 0; TK[7] = feat === HARBOUR ? STREET1 + 1.3 : STREET0 + 3.1; TK[9] = Math.floor(ci / 2);
+        TK[0] = 1; TK[1] = side * (sx + 2); TK[2] = -side; TK[3] = 2.5; TK[6] = 0; TK[7] = feat === HARBOUR ? STREET1 + 1.3 : STREET0 + 3.1; TK[9] = ci >= TANK_ARMOUR ? TANK_HITS + 1 : TANK_HITS;
       }
     } else if (TK[0] === 1) {
       const dx = mx - TK[1]!;
@@ -1039,9 +1189,21 @@ export function createRun(seed = 20261116) {
       if (who === AI) autopilot(IA, k);
       else for (let j = 0; j < NI; j++) IA[j] = I[who * NI + j]!;
       setCur(k);
-      const ko = M[5] === KO;
+      // v12: stunned (a pounce) it can't move; an AI's pounce crouches, then jumps at where its target was.
+      M[53] = Math.max(0, M[53]! - dt);
+      M[54] = Math.max(0, M[54]! - dt);
+      if (M[55]! > 0) {
+        M[19] = Math.max(M[19]!, 0.7);
+        if ((M[55] = Math.max(0, M[55]! - dt)) <= 0 && M[5] === WALK && M[57]! > 0) {
+          const dx = MV[M[57]! - 1]![0]! - M[0]!;
+          M[5] = AIR; M[4] = 11.5; M[3] = Math.max(-6, Math.min(6, dx / 0.5)); M[6] = dx >= 0 ? 1 : -1;
+          emit(E_JUMP, 0);
+        }
+      } else if (M[5] !== AIR) M[57] = 0;
+      const ko = M[5] === KO || M[53]! > 0 || M[55]! > 0, py = M[1]!;
       cl.step(M, k, dt, ko ? 0 : IA[0]!, ko ? 0 : IA[1]!, ko ? 0 : IA[3]!, who !== AI);
-      if (M[5] !== KO) {
+      if (M[1]! < py) pounce();
+      if (M[5] !== KO && !(M[53]! > 0)) {
         aim(IA[0]!);
         const t = IA[5]!;
         if (IA[2]) (M[20] = 0.3), (M[43] = isPunch(t) ? t : 0);
@@ -1050,14 +1212,17 @@ export function createRun(seed = 20261116) {
         M[45] = Math.max(0, M[45]! - dt);
         // The combo: the wind-up and the recovery run faster (./COMBO); a pause between actions drops it.
         const cm = M[46]! || 1;
-        if (cm > 1) (M[8] = Math.max(0, M[8]! - dt * (cm - 1))), (M[14] = Math.max(0, M[14]! - dt * (cm - 1)));
+        // (not the power punch: its wind-up is one fixed length, a tell to dodge)
+        if (cm > 1 && !M[52]) (M[8] = Math.max(0, M[8]! - dt * (cm - 1))), (M[14] = Math.max(0, M[14]! - dt * (cm - 1)));
+        if (M[8]! <= 0) M[52] = 0;
         if (M[8]! <= 0 && M[14]! <= 0 && M[34]! <= 0 && (M[47] = M[47]! + dt) > COMBO_GAP) M[46] = 1;
         if (M[20]! > 0 && M[8]! <= 0 && M[45]! <= 0) (M[20] = 0), chain(M[43]!, who === AI), punch(IA[1]!, M[43]!), (M[43] = 0);
-        if (M[34]! > 0 && (M[34] = M[34]! - dt * cm) <= 0) (M[34] = 0), M[5] !== KO && landPunch();
+        if (M[34]! > 0 && (M[34] = M[34]! - dt * (M[52] ? 1 : cm)) <= 0) (M[34] = 0), M[5] !== KO && landPunch();
         if (M[21]! > 0 && M[14]! <= 0 && M[45]! <= 0 && M[5] !== KO) {
           const q = M[44]!;
           (M[21] = 0), (M[44] = 0);
-          if (!(q >= T_BACK && q < T_BACK + NG)) chain(q, who === AI);
+          if (!(q >= T_BACK && q < T_BACK + NG) && !M[56]) chain(q, who === AI);
+          M[56] = 0;
           grab(q);
         }
         M[20] = Math.max(0, M[20]! - dt);
@@ -1088,8 +1253,10 @@ export function createRun(seed = 20261116) {
   /** Practice, after the monsters: the steps the player has done, the parked helicopter (back a moment after a
    *  swat), and a flattened building rebuilt (the whole block, the monster dropped off it). */
   function stepPractice(dt: number) {
-    const O = MV[0]!, md = O[5]!;
+    const O = MV[0]!, md = O[5]!, D = MV[DUMMY]!;
     O[7] = MAX_HP;
+    // The dummy gets its health back between bouts.
+    if (S[32] && D[54]! <= 0) D[7] = Math.min(MAX_HP, D[7]! + dt * 30);
     S[29] = S[29]! | (md === WALK && Math.abs(O[3]!) > 0.5 ? P_WALK : 0) | (md === CLIMB ? P_WALL : 0) | (md === CLIMB && Math.abs(O[33]!) > 0.3 ? P_CLIMB : 0);
     const h = HE;
     if (h[0] !== 1) {
@@ -1149,7 +1316,29 @@ export function createRun(seed = 20261116) {
     if (S[0] === DONE || M[5] === KO || M[24] !== IN) return setCur(0);
     if (S[0] === READY || S[0] === CLEAR) return void ((I[0] = S[0] === READY ? 0.6 : 0), setCur(0));
     const x = M[0]!, md = M[5]!, rival = k !== HERO;
+    // Practice's dummy never fights back: it stands, and walks back to its spot between bouts.
+    if (S[28] && k === DUMMY) {
+      const home = -SXv() * 0.45 + 5.5;
+      if (md === WALK && M[54]! <= 0 && Math.abs(home - x) > 0.4) I[0] = home > x ? 0.4 : -0.4;
+      return setCur(0);
+    }
+    // v12: a pounce under way: the crouch holds still (the tell), the jump keeps its line.
+    if (M[55]! > 0 || M[53]! > 0) return setCur(0);
+    if (md === AIR && M[57]! > 0) return void ((I[0] = M[3]! / 5), setCur(0));
     A[5] = Math.max(0, A[5]! - 1 / 60);
+    A[6] = Math.max(0, A[6]! - 1 / 60);
+    A[7] = Math.max(0, A[7]! - 1 / 60);
+    // v12: rivals fight back with the same moves, at an AI's rate: a power punch at a player in reach (its wind-up
+    // is the tell: step or jump clear), or on the street a pounce at one a little way off (a crouch first).
+    // (only a monster the run drives: online a screen's own seat on the autopilot must leave the run's state alone)
+    if (rival && M[28] === AI && M[8]! <= 0)
+      for (let j = 0; j < NM; j++) {
+        const O = MV[j]!;
+        if (j === k || O[28] === AI || O[24] !== IN || O[5] === KO) continue;
+        if (A[6]! <= 0 && powerReach(M, j)) return void ((A[6] = AI_POWER), (I[2] = 1), (I[5] = T_RIVAL + j), setCur(0));
+        const d = Math.abs(O[0]! - x);
+        if (A[7]! <= 0 && md === WALK && O[5] === WALK && d > 1.6 && d < 3.2) return void ((A[7] = AI_POWER * 1.6), (M[55] = POUNCE_TELL), (M[57] = j + 1), (M[6] = O[0]! > x ? 1 : -1), emit(E_TELL, j), setCur(0));
+      }
     // A rival bonks whoever is in reach, now and then.
     if (rival && A[5]! <= 0 && M[8]! <= 0) {
       fist();
