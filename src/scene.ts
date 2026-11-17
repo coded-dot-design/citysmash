@@ -82,8 +82,6 @@ type Pal = ReturnType<typeof palette>;
 const WORDS = ["CRUNCH!", "KRAK!", "SMASH!", "TIMBER!", "FLAT!", "SWAT!", "KA-BLAM!", "NOM!", "BOINK!", "STOMP!", "OOF!", "ZZAP!", "BONK!", "KER-THOOM!", "OUCH! HOT!", "POOF!", "CLANG!", "DERAILED!", "WHAM!", "+100", "+250", "BOOM!", "KNOCKED OFF!", "POUNCE!", "COMBO!", "!", "KRUNCH!"];
 /** The most the rig on a wall comes forward (and out) for its side wall seen strongly (./scene.ts wallFwd). */
 const WALL_FWD = 0.8;
-/** v16: how far the camera turns to face a held building on a wide stage (of the angle it is seen at; ./scene.ts stepCam). */
-const YAW = 0.6;
 const W_CRUNCH = 0, W_TIMBER = 3, W_FLAT = 4, W_SWAT = 5, W_BLAM = 6, W_NOM = 7, W_BOINK = 8, W_STOMP = 9, W_OOF = 10, W_ZAP = 11, W_BONK = 12, W_THOOM = 13, W_HOT = 14, W_POOF = 15, W_CLANG = 16, W_DERAIL = 17, W_WHAM = 18, W_P100 = 19, W_P250 = 20, W_BOOM = 21, W_KNOCK = 22, W_POUNCE = 23, W_COMBO = 24, W_TELL = 25, W_KRUNCH = 26;
 const TOD = ["DAY", "DUSK", "NIGHT"];
 /** Bits of facade knocked off: they fall to the street and stay there as rubble (until the city changes). */
@@ -551,11 +549,6 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     let moving = false;
     if (Math.abs(d) > 0.005) (cam.tx += d * Math.min(1, dt * 3)), (moving = true);
     if (Math.abs(e) > 0.005) (cam.ty += e * Math.min(1, dt * 2)), (moving = true);
-    // v16: wide stages only, while this screen's monster holds a wall: the camera turns (no pan, no zoom) to
-    // face the held building a little more, so a building far to the side shows less of its side wall.
-    const O = MV[net ? net.seat : 0]!, b = O[12]!;
-    const y = !V[7] && O[5] === CLIMB && O[24] === IN && b >= 0 ? YAW * Math.atan((run.BLD[b * 4]! + run.BLD[b * 4 + 1]! / 2 - cam.tx) / cam.dist) : 0, g = y - cam.yaw;
-    if (Math.abs(g) > 0.0005) (cam.yaw += g * Math.min(1, dt * 2.5)), (moving = true);
     return moving;
   }
 

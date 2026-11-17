@@ -75,16 +75,13 @@ try {
           // From straight in front and with the camera off to either side (two players apart, the street's ends):
           // the angle that shows a side wall.
           const at = (what) => {
-            const tx = sc.dio.cam.tx, yaw = sc.dio.cam.yaw;
+            const tx = sc.dio.cam.tx;
             for (const off of [0, -7, 7]) {
               sc.dio.cam.tx = M[0] + off;
-              // (v16: on a wide stage the game's camera turns to face the held building from where it is: ./src/scene.ts stepCam)
-              if (sc.dio.width / sc.dio.height >= 1.25) sc.dio.cam.yaw = 0.6 * Math.atan((r.BLD[b * 4] + r.BLD[b * 4 + 1] / 2 - sc.dio.cam.tx) / sc.dio.cam.dist);
               const [a, b2] = K.px(rig.tor, others(b)), [, b3] = K.px(rig.tor, others(-1));
               out.push({ b, s, what: what + (off ? ` (camera ${off > 0 ? "right" : "left"})` : ""), shown: a, alone: b2, bare: b3 });
             }
             sc.dio.cam.tx = tx;
-            sc.dio.cam.yaw = yaw;
           };
           at("rest");
           M[33] = 1; M[13] = 0.7; step(1); M[33] = 1; at("mid-climb");
