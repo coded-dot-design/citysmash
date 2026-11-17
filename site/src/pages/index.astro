@@ -4,13 +4,13 @@
 import Base from '../layouts/Base.astro';
 import { base, GZIP, FIZLET, REPO } from '../site';
 import { CITIES } from '../../../src/cities.ts';
-import { REACH, NR, GRAB_WALL, NGW, NG, GRAB_HELI, NGH, COMBO } from '../../../src/round.ts';
+import { REACH, NR, GRAB, GRAB_WALL, NGW, NG, GRAB_HELI, NGH, COMBO } from '../../../src/round.ts';
 const description = 'CitySmash: a giant cyber ape climbs and smashes his way across seven tabletop cities, day into night. Dress him in the garage, beat three rival giants to play them, play with friends online. Free in the browser, by Chris Cooley, built on Fizlet.';
 const kb = (GZIP / 1024).toFixed(1);
 const steps = [
   ['JUMP AT A WALL', 'Walk the street and jump at a building’s side: the jump grabs it. He climbs the side wall, set back from the front, so every window in reach stays in view. Your inside arm grips; your outside arm reaches round the corner to smash.'],
   ['TAP TO SMASH', `Tap or click the window you want: in reach, it lights green and he punches it. Long arms: three windows in on your floor, two on the floors above and below. Three hits a window: a chip, a crack, a hole. Out of reach it flashes red: TOO FAR. Quick, accurate taps chain a combo (up to ×${COMBO[COMBO.length - 1]}): he punches faster; a miss or a pause drops it.`],
-  ['TAP TO GRAB', 'One rule on the wall: if he can punch a window, he can grab what’s in it. Tap someone at a window in reach (it lights teal), a soldier, a parachute or food close by: he grabs it and eats. Swat a helicopter right next to him. Out of reach, TOO FAR: he swings at air. Live boxes and neon signs bite: pick the windows round them.'],
+  ['TAP TO GRAB', 'He grabs with the hand on the side he faces: in front of him, above and below it, never behind him or under his own body. Tap someone at a window (it lights teal at once): his arm reaches to them, lifts them to his mouth, NOM! and the points pop up. Tap someone behind him on the street and he turns round first, then grabs. On a wall: if he can punch a window he can grab what’s in it, plus the windows two up and down and the air over his head and under his feet. Hover (or tap) to see his grab reach. Out of reach: TOO FAR, and an arrow says where to go. Live boxes and neon signs bite: pick the windows round them.'],
   ['CITY AFTER CITY', 'Enough holes and a building shakes, then pancakes floor by floor. Flatten them all and the next city opens, later in the day and angrier: more soldiers, armour on the tanks, faster helicopters.'],
 ];
 const TOD = ['Day', 'Dusk', 'Night'];
@@ -23,7 +23,7 @@ const mons = [
 ] as const;
 // The reach diagram, from the game's own tables (src/round.ts REACH, GRAB_WALL, GRAB_HELI): six windows across
 // (two of open air and the ape's own column, then three of its building), five floors; the ape in the middle.
-const COLS = 6, ROWS = 5, APE_C = 2, APE_R = 2;
+const COLS = 6, ROWS = 7, APE_C = 2, APE_R = 3;
 const has = (t: number[], n: number, a: number, b: number, swap = false) => { for (let k = 0; k < n; k++) if ((swap ? t[k * 2 + 1] : t[k * 2]) === a && (swap ? t[k * 2] : t[k * 2 + 1]) === b) return true; return false; };
 const PUNCH_WORD: Record<string, string> = { '0,1': 'close', '0,2': 'mid', '0,3': 'far', '1,1': 'up', '1,2': 'up', '-1,1': 'down', '-1,2': 'down' };
 const grid = (kind: 'punch' | 'grab') => {
@@ -39,6 +39,16 @@ const grid = (kind: 'punch' | 'grab') => {
   return cells;
 };
 const punchCells = grid('punch'), grabCells = grid('grab');
+// On the street (src/round.ts GRAB, from the hand on the side he faces): behind him, the ape, then the fan
+// out in front, from the street up to over his head.
+const SCOLS = 5, SROWS = 5, S_TOP = 3;
+const streetCells: { cls: string; label: string }[] = [];
+for (let r = 0; r < SROWS; r++) for (let c = 0; c < SCOLS; c++) {
+  const dy = S_TOP - r, dx = c - 2;
+  if (c === 1) streetCells.push(has(GRAB, NG, -1, dy) ? { cls: 'grab', label: 'grab' } : { cls: 'ape', label: dy === 0 ? 'APE ▸' : '' });
+  else if (c === 0) streetCells.push({ cls: 'air', label: dy === 0 ? 'behind' : '' });
+  else streetCells.push(has(GRAB, NG, dx, dy) ? { cls: 'grab', label: 'grab' } : { cls: 'air', label: '' });
+}
 const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'presence', 'ui'];
 ---
 <Base title="CitySmash · climb it, smash it" description={description}>
@@ -70,9 +80,15 @@ const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'pr
           </div>
         </figure>
         <figure class="reach-fig">
-          <figcaption><b>GRAB: the {NR} punch windows + {NGW - NR} spaces off the building</b> ({NG} all round him off a wall)</figcaption>
-          <div class="reach-grid" role="img" aria-label={`Grab reach on a wall: the ${NR} punch windows (if he can punch it, he can grab it) and ${NGW - NR} spaces off the building, up, down and out into the air (people, soldiers, food); the ${NGH} round him take helicopters too. Off a wall: ${NG} spaces all round him.`}>
+          <figcaption><b>GRAB on a wall: the {NR} punch windows + {NGW - NR} more</b> from his free hand, never behind him</figcaption>
+          <div class="reach-grid" role="img" aria-label={`Grab reach on a wall, from his free hand: the ${NR} punch windows (if he can punch it, he can grab it), the windows two floors up and down from them, and the air of the gap over his head and under his feet (${NGW} in all); helicopters in the ${NGH} nearest his hand. Nothing behind him or behind the building.`}>
             {grabCells.map((x) => <span class={'rc ' + x.cls} data-cell={x.cls}>{x.label}</span>)}
+          </div>
+        </figure>
+        <figure class="reach-fig">
+          <figcaption><b>GRAB on the street: {NG} spaces in front</b>, from the street to over his head (by his head too)</figcaption>
+          <div class="reach-grid street" role="img" aria-label={`Grab reach on the street: ${NG} spaces in front of the hand on the side he faces, from the street up to over his head and in by his head; nothing behind him or under his body. Tap something behind him and he turns round first.`}>
+            {streetCells.map((x) => <span class={'rc ' + x.cls} data-cell={x.cls}>{x.label}</span>)}
           </div>
         </figure>
         <ul class="reach-key">
@@ -81,7 +97,7 @@ const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'pr
           <li><span class="rc air" aria-hidden="true"></span> open air</li>
           <li><span class="rc punch" aria-hidden="true"></span> punch: his own building only</li>
           <li><span class="rc grab" aria-hidden="true"></span> grab: people, soldiers, food</li>
-          <li><span class="rc heli" aria-hidden="true"></span> grab, and swat helicopters (next to him)</li>
+          <li><span class="rc heli" aria-hidden="true"></span> grab, and swat helicopters (by his hand)</li>
         </ul>
       </div>
       <p class="soon">Phone: the stick moves and climbs, JUMP jumps, tap what you want smashed or eaten. Computer: A/D walk, W/S climb, Space or K jumps, click to smash or grab, M mutes. No mouse or a gamepad: J punches (W or S held: up or down), a flick of the stick in or out steps the punch close, mid, far; L grabs the nearest snack. Each gamepad is a player of its own: press any button on the start menu to join.</p>

@@ -23,7 +23,7 @@ export const E_START = 1, E_PUNCH = 2, E_HOLE = 3, E_SHAKE = 4, E_FLOOR = 5, E_F
   E_SHOCK = 21, E_TANK = 22, E_BONK = 23, E_OUT = 24, E_BURN = 25, E_JOIN = 26, E_CHIP_ = E_CHIP, E_CRACK_ = E_CRACK, E_ARMOUR = 29, E_TRAIN = 30,
   E_BELLS = 31, E_RAM = 32, E_TRUCK = 33, E_SURGE = 34, E_CITY = 35, E_CLEAR = 36;
 /** The monsters, in seat order online: the ape, then the rivals. */
-export const NM = 4, MW = 48, HERO = 0, CRAB = 1, BLOB = 2, MOTH = 3;
+export const NM = 4, MW = 52, HERO = 0, CRAB = 1, BLOB = 2, MOTH = 3;
 /** Who drives a monster: a seat 0..3, or the AI. */
 export const SEATS = 4, AI = 9;
 export const MAX_HP = 100, SHOCK_HP = 7;
@@ -45,23 +45,38 @@ export const NI = 6;
  *  the edge)] per cell: level close, medium, far; up close, medium; down close, medium. Seven on a wall, five
  *  on its top floor (no row above; the bottom floor the same with no row below). */
 export const REACH = [0, 1, 0, 2, 0, 3, 1, 1, 1, 2, -1, 1, -1, 2], NR = 7;
-/** The grab's reach off a wall, [cells in towards where it faces, rows up] from the monster's own cell:
- *  people, soldiers and food anywhere in a plus two cells out every way and the four diagonal neighbours
- *  (12); helicopters only in the eight cells round it (on a wall too). */
-export const GRAB = [1, 0, 2, 0, -1, 0, -2, 0, 0, 1, 0, 2, 0, -1, 0, -2, 1, 1, 1, -1, -1, 1, -1, -1], NG = 12;
-/** The grab's reach on a wall, one rule: if it can punch a window it can grab what is in it. The building it
- *  holds: the seven reach cells (./REACH, in its order: g = c for reach cell c); off the building (the gap,
- *  the air, up and down its own column): GRAB's cells that are not on the building (8). 15 in all. */
-export const GRAB_WALL: number[] = [], NGW = 15;
+/** v11 (owner: "it's based on the centre of the ape, which works for punching but not grabbing"): the grab
+ *  reaches from the hand on the side it faces, never behind it or under its body. Off a wall: a fan in front,
+ *  [cells out from the hand, rows up from the hand]; cell (0, 0) is centred GRAB_X out from the body's middle
+ *  (the fist's reach, clear of the body: BODY_X is the body's half width) at the hand's height; the fan runs
+ *  from the street to over his head on the front side (12), and from the shoulder up it comes in a cell nearer
+ *  (−1: by his head, where the body is narrower; the scene never takes one his body covers on screen): 15.
+ *  Mirrors with where it faces. */
+export const GRAB = [0, -1, 0, 0, 0, 1, 0, 2, 0, 3, 1, -1, 1, 0, 1, 1, 1, 2, 2, 0, 2, 1, 2, -1, -1, 1, -1, 2, -1, 3], NG = 15;
+export const GRAB_X = 1.9, GRAB_Y = 1.6, BODY_X = 1.3;
+/** On a wall, one rule (if it can punch a window it can grab what is in it), from the free hand: the seven
+ *  reach cells on the front (./REACH, in its order: g = c for reach cell c), the windows two floors up and
+ *  down from them (close, mid), and the air of the gap on his side, over his head and under his feet; never
+ *  behind the building, behind him or where his body is. [cells in from the edge it holds, rows up]: 13. */
+export const GRAB_WALL: number[] = [], NGW = 13;
 for (let c = 0; c < NR; c++) GRAB_WALL.push(REACH[c * 2 + 1]!, REACH[c * 2]!);
-for (let g = 0; g < NG; g++) if (GRAB[g * 2]! <= 0) GRAB_WALL.push(GRAB[g * 2]!, GRAB[g * 2 + 1]!);
-export const GRAB_HELI = [1, 0, -1, 0, 0, 1, 0, -1, 1, 1, 1, -1, -1, 1, -1, -1], NGH = 8;
+GRAB_WALL.push(1, 2, 2, 2, 1, -2, 2, -2, 0, 3, 0, -3);
+/** Helicopters (a swat): the eight cells nearest the hand in front of it, and the one over his head (the same frame as GRAB). */
+export const GRAB_HELI = [1, -1, 1, 0, 1, 1, 1, 2, 2, -1, 2, 0, 2, 1, 0, 3], NGH = 8;
+/** Turning round for something behind: this long, then the grab (fixed). */
+export const TURN_T = 0.12;
 /** A target in the input (a tap or a click, 7 bits): 0 none, a reach cell to punch (T_CELL + cell), a grab
  *  cell to grab from (T_GRAB + g: whoever is at the window there; g in GRAB_WALL on a wall, GRAB off it), a
  *  helicopter to swat (T_HELI + h), a parachute (T_CHUTE + k) or a soldier (T_SOLDIER + s) to grab; off a
  *  wall a punch turned left or right (T_STREET + 0 or 1, at whatever is in front); a swing at nothing in
  *  reach (T_MISS: a whiff, no effect). */
 export const T_CELL = 1, T_GRAB = 8, T_HELI = 23, T_CHUTE = 25, T_SOLDIER = 45, T_END = 54, T_STREET = 54, T_MISS = 56;
+/** v11, off a wall: something behind him at grab cell g once he has turned (T_BACK + g: he turns, then
+ *  grabs); a window on the bottom floor from the street, j columns out from the hand (T_LOW + j; behind
+ *  him T_LOW + 3 + j: he turns, then punches it). Still 7 bits. */
+export const T_BACK = 57, T_LOW = 72, NLOW = 3, T_TOP = 78;
+/** Is target t a punch (else a grab)? */
+export const isPunch = (t: number) => (t >= T_CELL && t < T_GRAB) || (t >= T_HELI && t < T_CHUTE) || (t >= T_STREET && t <= T_MISS) || (t >= T_LOW && t < T_TOP);
 
 /** Practice (S[28]): one player, no army (a parked helicopter that never fires), no health lost, flattened
  *  buildings come back; its steps (bits in S[29]): walk, onto a wall, climb, punch all seven reach cells
@@ -87,7 +102,9 @@ export function createRun(seed = 20261116) {
    *  (0: not a wall punch), [39] the aim (0 close, 1 medium, 2 far), [40] the stick in a moment ago (−1, 0, 1: a flick steps the
    *  aim), [41] the grab's reach cell + 1, [42] that punch's target, [43] a punch's target pressed during the cooldown, [44] the
    *  same for a grab, [45] a whiff's recovery left (no punch or grab till it runs out), [46] the combo (./COMBO; 0 or 1: none), [47] the time since
-   *  its last action ended (the combo's gap). */
+   *  its last action ended (the combo's gap), [48] time held down at the bottom of a wall (a drop-off
+   *  needs a hold: the bottom floor stays in reach), [49] turning round for a grab behind (time left), [50] [51] where
+   *  the grab reaches to (x, y; 0: nowhere picked: the arm's own reach). */
   const MS = new Float64Array(NM * MW), MV: Float64Array[] = [];
   for (let k = 0; k < NM; k++) MV.push(MS.subarray(k * MW, k * MW + MW)), (MV[k]![31] = k);
   let M = MV[0]!, cur = 0;
@@ -166,7 +183,7 @@ export function createRun(seed = 20261116) {
     /** Every view of the run's state: saved, restored and hashed byte for byte. */
     bytes: [] as Uint8Array[],
     reset, step, clear, autopilot, autopilotOwn, join, setCur, humans, loadCity, top, yOff, standing, wallX, rowOf, sideTarget, nb, city,
-    levelRow, reachCell, reachCount, inReach, grabCell, grabCount, inGrab, winAt, GC,
+    levelRow, reachCell, reachCount, inReach, grabCell, grabCount, inGrab, winAt, lowCell, GC,
     get SX() {
       return SXv();
     },
@@ -391,11 +408,23 @@ export function createRun(seed = 20261116) {
       const b = O[12]!, s = O[22]!;
       GC[0] = (s < 0 ? BLD[b * 4]! : BLD[b * 4]! + BLD[b * 4 + 1]!) + (0.5 - dx) * s;
       GC[1] = yOff(b) + r + 0.5 + dy;
-    } else (GC[0] = O[0]! + dx * O[6]!), (GC[1] = O[1]! + (O[5] === ROOF ? 2.4 : 1.6) + dy);
+    } else (GC[0] = O[0]! + (GRAB_X + dx) * O[6]!), (GC[1] = O[1]! + (O[5] === ROOF ? 2.4 : GRAB_Y) + dy);
   }
-  /** How many grab cells monster O has (GRAB_WALL's 15 on a wall, GRAB's 12 off it). */
+  /** How many grab cells monster O has (GRAB_WALL's 13 on a wall, GRAB's 12 off it). */
   function grabCount(O: Float64Array) {
     return levelRow(O) >= 0 ? NGW : NG;
+  }
+  /** The bottom floor's window j columns out from monster O's hand on the street (j 0..2), or −1. */
+  function lowCell(O: Float64Array, j: number) {
+    if (O[5] !== WALK && !(O[5] === AIR && O[1]! < 0.6)) return -1;
+    const x = O[0]! + (GRAB_X + j) * O[6]!;
+    for (let b = 0; b < nb(); b++) {
+      const x0 = BLD[b * 4]!, w = BLD[b * 4 + 1]!;
+      if (x < x0 || x >= x0 + w || !standing(b)) continue;
+      const fl = B[b * 6 + 3]!;
+      return fl < BLD[b * 4 + 2]! ? C0[b]! + fl * w + Math.floor(x - x0) : -1;
+    }
+    return -1;
   }
   /** Is (x, y) in monster O's grab reach (one of its grab cells; `heli`: the helicopters' eight)? */
   function inGrab(O: Float64Array, x: number, y: number, heli = false) {
@@ -438,6 +467,8 @@ export function createRun(seed = 20261116) {
   function punch(my: number, t: number) {
     const md = M[5]!;
     let c = -1;
+    // A helicopter behind him (off a wall): he turns to it in the wind-up.
+    if (t >= T_HELI && t < T_CHUTE && md !== CLIMB && targetAt(t) && (TG[0]! - M[0]!) * M[6]! < 0) M[6] = -M[6]!;
     // A tapped target out of reach (or gone) is a whiff.
     if ((t >= T_CELL && t < T_GRAB && reachCell(M, t - T_CELL) < 0) || (t >= T_HELI && t < T_CHUTE && (!targetAt(t) || !inGrab(M, TG[0]!, TG[1]!, true)))) t = T_MISS;
     if (t >= T_CELL && t < T_GRAB) c = t - T_CELL;
@@ -447,6 +478,10 @@ export function createRun(seed = 20261116) {
       if (md === CLIMB && levelRow(M) >= 0) c = 0;
     } else if (t === T_STREET || t === T_STREET + 1) {
       if (md !== CLIMB) M[6] = t === T_STREET ? -1 : 1;
+    } else if (t >= T_LOW && t < T_TOP) {
+      // The bottom floor from the street: behind him, he turns first (the wind-up covers it).
+      if (md === CLIMB || md === ROOF) t = T_MISS, (M[45] = PUNCH_CD + WHIFF_T);
+      else if (t >= T_LOW + NLOW) (M[6] = -M[6]!), (t -= NLOW);
     } else if (t >= T_HELI && t < T_CHUTE) {
       // (a swat: the helicopter check at the hit frame)
     } else if (md === CLIMB && levelRow(M) >= 0) {
@@ -529,7 +564,13 @@ export function createRun(seed = 20261116) {
       }
       return void emit(E_WHIFF, 0);
     }
-    // From the street: soldiers, the tank, the train, the trucks (the buildings are smashed from their sides).
+    // From the street: a window on the bottom floor in front (v11, owner: "you can't smash the bottom floor"),
+    // then soldiers, the tank, the train, the trucks.
+    if (t >= T_LOW && t < T_LOW + NLOW) {
+      const i = lowCell(M, t - T_LOW);
+      if (i >= 0 && cell[i] !== HOLE) return void (LIVE[i] ? shock(i) : bk.strike(i, cur));
+      return void emit(E_WHIFF, 0);
+    }
     let hit = false;
     if (M[1]! < 2.5) {
       for (let s = 0; s < NS; s++) {
@@ -607,12 +648,26 @@ export function createRun(seed = 20261116) {
   function grab(t: number) {
     const md = M[5]!;
     let i = -1;
+    // Behind him (off a wall): he turns to face it (TURN_T), then grabs (the target queued again).
+    const off = md !== CLIMB && md !== KO;
+    let back = off && t >= T_BACK && t < T_BACK + NG;
+    if (!back && off && t >= T_CHUTE && t < T_END && targetAt(t) && (TG[0]! - M[0]!) * M[6]! < 0) back = true;
+    if (back) {
+      M[6] = -M[6]!;
+      M[49] = TURN_T;
+      M[14] = TURN_T;
+      M[21] = TURN_T + 0.3;
+      M[44] = t >= T_BACK && t < T_BACK + NG ? t - T_BACK + T_GRAB : t;
+      return true;
+    }
+    M[50] = M[51] = 0;
     // A tapped target out of reach (or gone): the hand closes on air.
     let miss = false;
     if (t >= T_GRAB && t < T_HELI) {
       if (t - T_GRAB >= grabCount(M)) miss = true;
-      else if (grabCell(M, t - T_GRAB), (i = winAt(GC[0]!, GC[1]!)) < 0) miss = true;
+      else if (grabCell(M, t - T_GRAB), (M[50] = GC[0]!), (M[51] = GC[1]!), (i = winAt(GC[0]!, GC[1]!)) < 0) miss = true;
     } else if (t >= T_CHUTE && t < T_END && (!targetAt(t) || !inGrab(M, TG[0]!, TG[1]!))) miss = true;
+    else if (t >= T_CHUTE && t < T_END) (M[50] = TG[0]!), (M[51] = TG[1]!);
     M[14] = GRAB_CD;
     M[10] = 1;
     // The arm's motion: the punch's for that cell when it is one of the punch's seven, else the close jab's.
@@ -673,6 +728,25 @@ export function createRun(seed = 20261116) {
       return void emit(E_WHIFF, 1);
     }
     if (md === ROOF && ANT[M[12]!]! === ANT[M[12]!]! && Math.abs(ANT[M[12]!]! - fx) < 1.1) return shock(-1 - M[12]!);
+    // Off a wall (the keys', a gamepad's grab): whoever is at a window in the front fan, nearest the hand first.
+    if (md !== ROOF) {
+      let best = -1, bd = 99, bg = 0;
+      for (let g = 0; g < NG; g++) {
+        grabCell(M, g);
+        const j = winAt(GC[0]!, GC[1]!);
+        if (j < 0 || !occ[j] || cell[j] === HOLE) continue;
+        const d = Math.abs(GRAB[g * 2]!) + Math.abs(GRAB[g * 2 + 1]!) + (occ[j] === 3 ? 4 : 0);
+        if (d < bd) (bd = d), (best = j), (bg = g);
+      }
+      if (best >= 0) {
+        grabCell(M, bg);
+        (M[50] = GC[0]!), (M[51] = GC[1]!);
+        const kind = occ[best]!;
+        if (kind === 3) return burn(best);
+        occ[best] = 0;
+        return snack(kind === 2 ? 12 : 16, best);
+      }
+    }
     // A soldier off the street.
     if (md === WALK || (md === AIR && M[1]! < 2))
       for (let s = 0; s < NS; s++) {
@@ -970,8 +1044,9 @@ export function createRun(seed = 20261116) {
       if (M[5] !== KO) {
         aim(IA[0]!);
         const t = IA[5]!;
-        if (IA[2]) (M[20] = 0.3), (M[43] = (t >= T_CELL && t < T_GRAB) || (t >= T_HELI && t < T_CHUTE) || t >= T_STREET ? t : 0);
-        if (IA[4]) (M[21] = 0.3), (M[44] = (t >= T_GRAB && t < T_HELI) || (t >= T_CHUTE && t < T_END) ? t : 0);
+        if (IA[2]) (M[20] = 0.3), (M[43] = isPunch(t) ? t : 0);
+        if (IA[4]) (M[21] = 0.3), (M[44] = (t >= T_GRAB && t < T_HELI) || (t >= T_CHUTE && t < T_END) || (t >= T_BACK && t < T_BACK + NG) ? t : 0);
+        M[49] = Math.max(0, M[49]! - dt);
         M[45] = Math.max(0, M[45]! - dt);
         // The combo: the wind-up and the recovery run faster (./COMBO); a pause between actions drops it.
         const cm = M[46]! || 1;
@@ -979,7 +1054,12 @@ export function createRun(seed = 20261116) {
         if (M[8]! <= 0 && M[14]! <= 0 && M[34]! <= 0 && (M[47] = M[47]! + dt) > COMBO_GAP) M[46] = 1;
         if (M[20]! > 0 && M[8]! <= 0 && M[45]! <= 0) (M[20] = 0), chain(M[43]!, who === AI), punch(IA[1]!, M[43]!), (M[43] = 0);
         if (M[34]! > 0 && (M[34] = M[34]! - dt * cm) <= 0) (M[34] = 0), M[5] !== KO && landPunch();
-        if (M[21]! > 0 && M[14]! <= 0 && M[45]! <= 0 && M[5] !== KO) (M[21] = 0), chain(M[44]!, who === AI), grab(M[44]!), (M[44] = 0);
+        if (M[21]! > 0 && M[14]! <= 0 && M[45]! <= 0 && M[5] !== KO) {
+          const q = M[44]!;
+          (M[21] = 0), (M[44] = 0);
+          if (!(q >= T_BACK && q < T_BACK + NG)) chain(q, who === AI);
+          grab(q);
+        }
         M[20] = Math.max(0, M[20]! - dt);
         M[21] = Math.max(0, M[21]! - dt);
       }

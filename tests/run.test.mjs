@@ -184,82 +184,157 @@ test("a tap picks the window: in reach it is punched (live parts too), out of re
   void w;
 });
 
-test("the grab's reach: people, soldiers and food in the 12 cells round it on every side; helicopters only next to it; out of reach the hand closes on air", () => {
-  assert.equal(R.GRAB.length, 24, "12 grab cells, one table");
-  assert.equal(R.GRAB_HELI.length, 16, "8 for the helicopters, one table");
-  const g = (dx, dy) => { for (let i = 0; i < R.NG; i++) if (R.GRAB[i * 2] === dx && R.GRAB[i * 2 + 1] === dy) return i; return -1; };
-  const run = quiet(), M = run.M, b = 3, x0 = run.BLD[b * 4];
-  run.LIVE.fill(0);
-  hangAt(run, M, b, -1, 3);
-  play(run, 10);
-  const lv = run.yOff(b) + 3 + 0.5, me = x0 - 0.5;
-  const grab = (t, n = 30) => play(run, n, (I, f) => ((I[4] = f === 0 ? 1 : 0), (I[5] = f === 0 ? t : 0)));
-  const noms = (ev) => ev.filter((e) => e[0] === R.E_NOM).length;
-  // In towards the building: someone two windows in.
-  run.occ[cellOf(run, b, 3, 1)] = 1;
-  assert.equal(noms(grab(R.T_GRAB + g(2, 0))), 1, "in: eaten");
-  // Out into the air, up, down: a parachute two cells away each way.
-  for (const [dx, dy, name] of [[-2, 0, "out (the air side)"], [0, 2, "up"], [0, -2, "down"], [-1, 1, "a diagonal"]]) {
-    run.CH.fill(0);
-    run.CH.set([1, me - dx, lv + dy, 0.3, 0, 0, 1, 0, 0], 0);
-    assert.equal(noms(grab(R.T_CHUTE + 0)), 1, `${name}: grabbed`);
+test("v11: the grab reaches from the facing hand: a fan in front, above and below, never behind him or under his body; it mirrors with where he faces", () => {
+  assert.equal(R.GRAB.length, R.NG * 2, "12 grab cells, one table");
+  assert.equal(R.GRAB_HELI.length, R.NGH * 2, "8 for the helicopters, one table");
+  const run = quiet(), M = run.M;
+  M[5] = WALK; M[0] = 0; M[1] = 0; M[2] = 1.9;
+  for (const f of [1, -1]) {
+    M[6] = f;
+    for (const T of [undefined, R.GRAB_HELI]) for (let g = 0, n = T ? R.NGH : R.NG; g < n; g++) {
+      run.grabCell(M, g, T);
+      const out = (run.GC[0] - M[0]) * f;
+      // Every cell is in front: below the shoulder its whole width out past the body (the cell is 0.92 wide,
+      // half 0.46); from the shoulder up (by the head, narrower) its centre at least as far out as the hand's side.
+      const dy = (T ?? R.GRAB)[g * 2 + 1];
+      if (dy < 1) assert.ok(out - 0.46 >= R.BODY_X - 0.01, `facing ${f}, cell ${g}${T ? " (helicopter)" : ""}: ${out.toFixed(2)} out, clear of the body`);
+      else assert.ok(out >= 0.85, `facing ${f}, cell ${g}: ${out.toFixed(2)} out, in front of him`);
+      assert.ok(run.GC[1] > 0, "not under the street");
+    }
   }
-  // Three away (out of reach): the hand closes on air.
-  run.CH.fill(0);
-  run.CH.set([1, me - 3, lv, 0.3, 0, 0, 1, 0, 0], 0);
-  const miss = grab(R.T_CHUTE + 0);
-  assert.equal(noms(miss), 0, "out of reach: nothing");
-  assert.ok(miss.some((e) => e[0] === R.E_WHIFF), "a whiff");
-  assert.ok(run.CH[0] > 0, "the parachute is still there");
-  // A helicopter: swatted next to it, a whiff two cells away.
-  const heli = (dx) => {
-    run.HE.fill(0);
-    run.HE.set([1, me - dx, lv, 0.4], 0);
-    run.HE[8] = run.HE[20] = 1e9;
-    return play(run, 20, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[5] = f === 0 ? R.T_HELI : 0)));
-  };
-  assert.ok(heli(-2).some((e) => e[0] === R.E_WHIFF) && run.HE[0] === 1, "a chopper two away: a whiff");
-  assert.ok(heli(-1).some((e) => e[0] === R.E_HELI), "a chopper next to it: swatted");
+  // In front, above the head and down at the street all count; behind, not.
+  M[6] = 1;
+  const hy = R.GRAB_Y;
+  assert.ok(run.inGrab(M, R.GRAB_X, hy), "in front, at the hand");
+  assert.ok(run.inGrab(M, R.GRAB_X, hy + 3), "in front, over his head");
+  assert.ok(run.inGrab(M, R.GRAB_X, hy - 1), "in front, down at the street");
+  assert.ok(run.inGrab(M, R.GRAB_X + 2, hy), "two out");
+  assert.ok(!run.inGrab(M, -R.GRAB_X, hy) && !run.inGrab(M, 0, hy) && !run.inGrab(M, 0, hy + 1) && !run.inGrab(M, -0.9, hy + 2), "behind him and his own body's middle: not in reach");
+  assert.ok(run.inGrab(M, 0.9, hy + 2), "by his head, in front: in reach");
+  M[6] = -1;
+  assert.ok(run.inGrab(M, -R.GRAB_X, hy) && !run.inGrab(M, R.GRAB_X, hy), "it mirrors with where he faces");
 });
 
-test("on the building he holds, if he can punch a window he can grab what's in it: the 7 punch cells (the far one too); 4 in is too far; off the building the 12 stay; helicopters next to him only", () => {
+test("v11: on the street a person in front is grabbed (the pop: NOM); one behind: he turns (fixed time), then grabs; a soldier behind too; out of reach a whiff", () => {
+  const run = quiet(1), M = run.M, b = 2, x0 = run.BLD[b * 4];
+  run.LIVE.fill(0);
+  const grab = (t, n = 40) => play(run, n, (I, f) => ((I[4] = f === 0 ? 1 : 0), (I[5] = f === 0 ? t : 0)));
+  const noms = (ev) => ev.filter((e) => e[0] === R.E_NOM).length;
+  const g = (dx, dy) => { for (let i = 0; i < R.NG; i++) if (R.GRAB[i * 2] === dx && R.GRAB[i * 2 + 1] === dy) return i; return -1; };
+  const stand = (x, f) => { M[5] = WALK; M[0] = x; M[1] = 0; M[2] = 1.9; M[6] = f; M[3] = 0; M[14] = 0; M[45] = 0; M[49] = 0; play(run, 2); };
+  // Facing the building, the ground floor's window two columns in front of the hand: someone there.
+  stand(x0 + 0.5 - R.GRAB_X, 1);
+  run.grabCell(M, g(0, 0));
+  const i = run.winAt(run.GC[0], run.GC[1]);
+  assert.ok(i >= 0, "the cell in front of the hand is a window");
+  run.occ[i] = 1;
+  const ev = grab(R.T_GRAB + g(0, 0));
+  assert.equal(noms(ev), 1, "in front: eaten, with the pop");
+  assert.equal(run.occ[i], 0);
+  assert.ok(M[50] !== 0 && Math.abs(M[50] - (x0 + 0.5)) < 0.6, "the arm reaches to that spot");
+  // Behind: he faces away from it; the scene's code for it is T_BACK + the cell once turned.
+  stand(x0 + 0.5 + R.GRAB_X, 1);
+  run.occ[i] = 1;
+  const before = M[6];
+  const ev2 = play(run, 4, (I, f) => ((I[4] = f === 0 ? 1 : 0), (I[5] = f === 0 ? R.T_BACK + g(0, 0) : 0)));
+  assert.equal(M[6], -before, "he turned to face it");
+  assert.equal(noms(ev2), 0, "not yet: the turn first");
+  const ev3 = play(run, 30);
+  assert.equal(noms(ev3), 1, "then grabbed");
+  assert.equal(run.occ[i], 0);
+  // A soldier behind him in reach once turned: he turns, then eats it.
+  stand(0, 1);
+  run.SO.fill(0);
+  run.SO.set([1, -R.GRAB_X, 2, 1, 0, 9, 0, 0], 0);
+  const ev4 = grab(R.T_SOLDIER + 0, 40);
+  assert.equal(M[6], -1, "turned round to the soldier");
+  assert.equal(noms(ev4), 1, "and ate him");
+  // Far off: the hand closes on air.
+  stand(0, 1);
+  run.CH.fill(0);
+  run.CH.set([1, 7, 1.6, 0.3, 0, 0, 1, 0, 0], 0);
+  const m = grab(R.T_CHUTE + 0);
+  assert.ok(m.some((e) => e[0] === R.E_WHIFF) && noms(m) === 0 && run.CH[0] > 0, "out of reach: a whiff");
+});
+
+test("v11: on a wall the grab is the 7 punch cells, the windows above and below them on the front and the gap's air over his head and under his feet; nothing behind the building or behind him; every grab pops", () => {
   assert.equal(R.GRAB_WALL.length, R.NGW * 2, "one wall table");
   for (let c = 0; c < R.NR; c++) assert.deepEqual([R.GRAB_WALL[c * 2], R.GRAB_WALL[c * 2 + 1]], [R.REACH[c * 2 + 1], R.REACH[c * 2]], `grab cell ${c} is reach cell ${c}`);
-  for (let g = R.NR; g < R.NGW; g++) assert.ok(R.GRAB_WALL[g * 2] <= 0, `wall grab cell ${g} is off the building`);
-  assert.equal(R.NGW - R.NR, 8, "GRAB's 8 off-building cells on a wall");
+  for (let g = 0; g < R.NGW; g++) {
+    const dx = R.GRAB_WALL[g * 2], dy = R.GRAB_WALL[g * 2 + 1];
+    assert.ok(dx >= 0, `wall grab cell ${g}: not behind him`);
+    if (dx === 0) assert.ok(Math.abs(dy) >= 3, `wall grab cell ${g}: in the gap only over his head or under his feet`);
+  }
   const run = quiet(), M = run.M, b = 3;
   run.LIVE.fill(0);
-  hangAt(run, M, b, -1, 2);
+  hangAt(run, M, b, -1, 4);
   play(run, 10);
   const grab = (t) => play(run, 30, (I, f) => ((I[4] = f === 0 ? 1 : 0), (I[5] = f === 0 ? t : 0)));
   const noms = (ev) => ev.filter((e) => e[0] === R.E_NOM).length;
-  // Every reach cell: someone there is eaten by a grab at that cell (the far punch's, three in, included).
-  for (let c = 0; c < R.NR; c++) {
-    const i = run.reachCell(M, c);
+  for (let g = 0; g < R.NGW; g++) {
+    run.grabCell(M, g);
+    const i = run.winAt(run.GC[0], run.GC[1]);
+    if (i < 0) continue;
+    run.occ.fill(0);
     run.occ[i] = 1;
-    assert.equal(noms(grab(R.T_GRAB + c)), 1, `reach cell ${c} (${R.REACH[c * 2]} up, ${R.REACH[c * 2 + 1]} in): eaten`);
-    assert.equal(run.occ[i], 0);
+    assert.equal(noms(grab(R.T_GRAB + g)), 1, `wall grab cell ${g}: eaten, with the pop`);
   }
-  // Four in (past the far punch): out of reach, a whiff (the scene shows TOO FAR), nobody eaten.
-  const far = cellOf(run, b, 2, 3);
-  run.occ[far] = 1;
-  assert.ok(!run.inGrab(M, run.BLD[b * 4] + 3.5, run.yOff(b) + 2.5), "4 in is not in the grab's reach");
-  assert.ok(run.inGrab(M, run.BLD[b * 4] + 2.5, run.yOff(b) + 2.5), "3 in (the far punch) is");
-  // The scene's tap there is T_MISS; a grab code past the table is a miss too.
+  const lv = run.yOff(b) + 4 + 0.5, edge = run.BLD[b * 4];
+  assert.ok(!run.inGrab(M, edge - 1.5, lv) && !run.inGrab(M, edge - 2.5, lv), "behind him (out in the street's air): nothing");
+  assert.ok(!run.inGrab(M, edge - 0.5, lv) && !run.inGrab(M, edge - 0.5, lv - 1), "his own column, where his body is: nothing");
+  assert.ok(!run.inGrab(M, edge + 3.5, lv), "4 in is too far");
   const m = grab(R.T_GRAB + R.NGW);
-  assert.ok(m.some((e) => e[0] === R.E_WHIFF) && noms(m) === 0 && run.occ[far] === 1, "too far: a whiff");
-  // The untargeted grab (a key, the gamepad, the AI) takes from the same 7.
+  assert.ok(m.some((e) => e[0] === R.E_WHIFF) && noms(m) === 0, "a code past the table: a whiff");
   run.occ.fill(0);
   run.occ[run.reachCell(M, 2)] = 1;
   assert.equal(noms(play(run, 30, (I, f) => (I[4] = f === 0 ? 1 : 0))), 1, "the gamepad's grab reaches the far cell");
-  // Off a wall: the 12-cell table, unchanged.
   M[5] = WALK; M[1] = 0; M[2] = 1.9;
-  assert.equal(run.grabCount(M), R.NG, "off a wall: 12");
-  hangAt(run, M, b, -1, 2);
-  assert.equal(run.grabCount(M), R.NGW, "on a wall: 15");
-  // Helicopters: only the 8 round him.
-  const lv = run.yOff(b) + 2 + 0.5, me = run.BLD[b * 4] - 0.5;
-  assert.ok(run.inGrab(M, me - 1, lv, true) && !run.inGrab(M, me - 2, lv, true), "a chopper: next to him only");
+  assert.equal(run.grabCount(M), R.NG, "off a wall: 15");
+  hangAt(run, M, b, -1, 4);
+  assert.equal(run.grabCount(M), R.NGW, "on a wall: 13");
+  // Helicopters: in front of the hand, swatted; behind him, not.
+  const heli = (x) => {
+    run.HE.fill(0);
+    run.HE.set([1, x, lv, 0.4], 0);
+    run.HE[8] = run.HE[20] = 1e9;
+    return play(run, 20, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[5] = f === 0 ? R.T_HELI : 0)));
+  };
+  assert.ok(heli(edge - 1.5).some((e) => e[0] === R.E_WHIFF) && run.HE[0] === 1, "a chopper behind him: a whiff");
+  assert.ok(heli(edge + 0.5).some((e) => e[0] === R.E_HELI), "a chopper in front of the hand: swatted");
+});
+
+test("v11: the bottom floor smashes: from the street a ground-floor window in front reaches a hole (chip, crack, hole); behind, he turns; from the wall at the lowest hang the down cell reaches it; held down at the bottom a moment, he lets go", () => {
+  const run = quiet(2), M = run.M, b = 1, x0 = run.BLD[b * 4];
+  run.LIVE.fill(0);
+  const punch = (t) => play(run, 30, (I, f) => ((I[2] = f === 0 ? 1 : 0), (I[5] = f === 0 ? t : 0)));
+  M[5] = WALK; M[0] = x0 + 0.5 - R.GRAB_X; M[1] = 0; M[2] = 1.9; M[6] = 1;
+  play(run, 2);
+  const i = run.lowCell(M, 0);
+  assert.equal(i, cellOf(run, b, 0, 0), "the window in front of the hand on the bottom floor");
+  for (let k = 0; k < 3; k++) punch(R.T_LOW);
+  assert.equal(run.cell[i], HOLE, "from the street: three hits, a hole");
+  // Behind: he turns in the wind-up and hits it.
+  M[6] = 1; M[0] = x0 + 1.5 + R.GRAB_X;
+  play(run, 2);
+  const j = cellOf(run, b, 0, 1);
+  punch(R.T_LOW + R.NLOW);
+  // (now it is in front: the scene's next taps on it are front codes)
+  punch(R.T_LOW); punch(R.T_LOW);
+  assert.equal(M[6], -1, "turned to it");
+  assert.equal(run.cell[j], HOLE, "behind: a hole too");
+  // From the wall: climb down to the bottom (down held, not long enough to let go), punch down close.
+  const b2 = 3, w2 = run.BLD[b2 * 4 + 1];
+  hangAt(run, M, b2, 1, 2);
+  play(run, 120, (I, f) => (I[1] = f < 100 && run.M[1] > 0.06 ? -1 : 0));
+  assert.equal(M[5], CLIMB, "still on the wall at the bottom");
+  assert.ok(M[1] <= 0.06, "at the lowest hang");
+  const g = run.reachCell(M, 5);
+  assert.equal(g, cellOf(run, b2, 0, w2 - 1), "down close is the bottom floor's edge window");
+  for (let k = 0; k < 3; k++) punch(R.T_CELL + 5);
+  assert.equal(run.cell[g], HOLE, "from the wall: a hole on the bottom floor");
+  // Down held on at the bottom: after a moment he lets go.
+  play(run, 40, (I) => (I[1] = -1));
+  assert.equal(M[5], WALK, "held down at the bottom, he lets go");
 });
 
 test("the combo: fast, accurate taps speed the punch up (x1 -> x1.25 -> x1.5 -> x1.6); a whiff or a pause drops it; ten taps out of reach give nothing; the AI only to x1.25", () => {

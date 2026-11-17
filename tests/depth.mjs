@@ -12,6 +12,9 @@ import { serve, launchOptions } from "./serve.mjs";
 
 const fixture = readFileSync("tests/fixtures/page.html", "utf8");
 const page = fixture.replace("</body>", `<script type="module">import { createCitySmash } from "/dist/citysmash.mjs"; window.game = createCitySmash({ host: document.getElementById("board"), seed: 3, store: { get: () => null, set() {} } });</script></body>`);
+const { CITIES, R_TANK } = await import("../src/cities.ts");
+/** City ci's buildings with the rooftop water tank (the deep-ledge, wide-roof kit of owner screenshots 163 and 166). */
+const tankKit = (ci) => CITIES[ci].b.map((_, b) => b).filter((b) => b !== CITIES[ci].landmark && CITIES[ci].roofs[(b + ci) % CITIES[ci].roofs.length] === R_TANK);
 const server = await serve(".", { "/": page });
 const browser = await chromium.launch(launchOptions());
 const KIT = `window.kit = (sc) => {
@@ -32,7 +35,7 @@ try {
     for (let ci = 0; ci < (w === 1440 ? 7 : 2); ci++) {
       await p.evaluate((ci) => game.play(ci), ci);
       await p.waitForFunction(() => game.scene?.state.drawn);
-      const res = await p.evaluate(() => {
+      const res = await p.evaluate((tanks) => {
         const sc = game.scene, r = sc.run, K = kit(sc), out = [];
         sc.engine.stop();
         const step = (n) => { for (let i = 0; i < n; i++) sc.engine.advance(1 / 60); };
@@ -49,7 +52,7 @@ try {
           for (const o of slabs) gs.push([o, o.alpha]), (o.alpha = 0);
           return () => gs.forEach(([g, a]) => (g.alpha = a));
         };
-        for (const b of [1, nb - 2]) for (const s of [-1, 1]) {
+        for (const b of [...new Set([1, nb - 2, ...tanks])]) for (const s of [-1, 1]) {
           r.cell.fill(2); r.B.fill(0); r.occ.fill(0); r.HIT.fill(0); r.SO.fill(0); r.CH.fill(0);
           const fl = Math.min(2, r.BLD[b * 4 + 2] - 2);
           const hang = () => { M[5] = 2; M[12] = b; M[22] = s; M[0] = r.wallX(b, s); M[2] = -0.55; M[6] = -s; M[1] = fl + 0.5 - 1.9; M[3] = 0; M[4] = 0; M[7] = 100; M[8] = 0; M[33] = 0; M[20] = 0; M[34] = 0; };
@@ -78,8 +81,9 @@ try {
         }
         sc.engine.start();
         return out;
-      });
+      }, tankKit(ci));
       for (const o of res) {
+        o.tank = tankKit(ci).includes(o.b);
         n++;
         const vis = o.alone ? o.shown / o.alone : 1;
         worst = Math.min(worst, vis);
@@ -88,11 +92,15 @@ try {
         // With the camera on the gap's side the side wall he hangs on faces the camera: it must not cover him
         // (only the front corner may, in perspective). Before v9 it drew over him (down to 50% showing).
         const gap = (o.s < 0 && o.what.includes("camera left")) || (o.s > 0 && o.what.includes("camera right")), held = o.bare ? o.shown / o.bare : 1;
+        // v11 (owner screenshots 163, 166): the deep-ledge building with the rooftop tank. Its held front's ledge
+        // slabs ran the building's whole depth, so with the camera on his side they sliced through him; the
+        // ledges are lips on the front now, the roof slab and its furniture sort with the side walls.
+        if (gap && o.tank && held < 0.8) bad.push(`city ${ci}, the tank-roof building ${o.b} ${o.s < 0 ? "left" : "right"} side, ${o.what}: its front leaves ${(held * 100).toFixed(0)}% of the torso`);
         if (gap && held < 0.65) bad.push(`city ${ci}, building ${o.b} ${o.s < 0 ? "left" : "right"} side, ${o.what}: the building he holds leaves ${(held * 100).toFixed(0)}% of the torso`);
       }
     }
     assert.deepEqual(bad, [], `${w}: no neighbouring building covers the ape on a wall`);
-    assert.ok(n >= (w === 1440 ? 7 * 4 * 8 * 3 : 2 * 4 * 8 * 3), `${w}: ${n} poses checked`);
+    assert.ok(n >= (w === 1440 ? 7 * 4 * 9 * 3 : 2 * 4 * 9 * 3), `${w}: ${n} poses checked`);
     // The street's little things against the ape on the street: a parachute behind him (nearer the buildings)
     // draws behind his torso, one in front of him over it; a soldier at his feet behind him, behind his legs.
     const st = await p.evaluate(() => {

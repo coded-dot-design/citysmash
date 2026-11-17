@@ -4,7 +4,8 @@
 // jitter, spikes). A (1440) hosts a room for two; B (a 390 phone) opens the invite link and drops
 // straight in. A is the ape, B takes SHARDCLAW; the ape's look reaches B's screen. Both play (each its
 // own seat, on the autopilot): the runs stay identical (no desync; byte for byte on a frame both hold);
-// then B closes its tab and SHARDCLAW goes back to the AI on A, which plays on. Waits on state.
+// then B closes its tab and SHARDCLAW goes back to the AI on A, which plays on, and its link keeps stepping
+// after the run ends there. Waits on state.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
@@ -73,7 +74,13 @@ try {
   await B.context().close();
   await until(A, () => game.net.left & 2 && game.scene.run.MV[1][28] === 9, null, "SHARDCLAW back to the AI");
   const f0 = await A.evaluate(() => game.net.final);
-  await until(A, (f0) => game.net.final > f0 + 120, f0, "A plays on");
+  await A.waitForFunction((f0) => game.net.final > f0 + 120, f0, { timeout: 30000, polling: 100 }).catch(async () => assert.fail(`A plays on: timed out (from ${f0}: ${JSON.stringify(await A.evaluate(() => { const n = game.net; return { frame: n.frame, final: n.final, stalls: n.stalls, waits: n.waits, left: n.left, leftAt: n.leftAt?.(1), phase: game.scene.run.S[0], end: game.scene.state.end }; }))})`));
+  // The run ending on A (its last player shrunk: the end of the run) must not stop the link: the engine kept
+  // stepping only while the run was on, so a run that ended right after B left stalled the final frames
+  // ("A plays on: timed out" on CI, v10). Online it steps every frame now.
+  await A.evaluate(() => (game.scene.run.S[0] = 3));
+  const f1 = await A.evaluate(() => game.net.final);
+  await until(A, (f1) => game.net.final > f1 + 60, f1, "the link steps on after the run ends");
   assert.deepEqual(errors, [], "no page errors");
   console.log("CitySmash online: green (host, link join, the look travels, identical runs, a leaver goes back to the AI).");
 } finally {

@@ -17,11 +17,12 @@ import { sound } from "@fzlt/core/sound";
 import { wreckage, type Wreckage } from "./fx.ts";
 import { person, sniper, soldier, cracks, bite, type Ink } from "./paint.ts";
 import { DEPTH, STREET0, STREET1, INTACT, CRACKED, HOLE, SHAKE, FALL, RUBBLE } from "./block.ts";
+import { HAND } from "./climber.ts";
 import {
   createRun, NM, NS, NP, NCH, NH, NT, SEATS, AI, HERO, CRAB, IN, READY, RUN, CLEAR, DONE, CLIMB, ROOF, KO,
   E_START, E_HOLE, E_SHAKE, E_FLOOR, E_FLAT, E_HELI, E_HELI_CRASH, E_NOM, E_HURT, E_FLING, E_DROP, E_KO, E_END, E_STOMP, E_JUMP, E_LAND, E_CLIMB,
   E_SHOCK, E_TANK, E_BONK, E_BURN, E_JOIN, E_CHIP_, E_CRACK_, E_ARMOUR, E_TRAIN, E_BELLS, E_RAM, E_TRUCK, E_SURGE, E_CITY, E_CLEAR, E_PUNCH,
-  NI, NR, NG, P_ALL, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS,
+  NI, NR, NG, P_ALL, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
@@ -77,8 +78,10 @@ function palette(c: City, light: boolean) {
   };
 }
 type Pal = ReturnType<typeof palette>;
-const WORDS = ["CRUNCH!", "KRAK!", "SMASH!", "TIMBER!", "FLAT!", "SWAT!", "KA-BLAM!", "NOM!", "BOINK!", "STOMP!", "OOF!", "ZZAP!", "BONK!", "KER-THOOM!", "OUCH! HOT!", "POOF!", "CLANG!", "DERAILED!", "WHAM!"];
-const W_CRUNCH = 0, W_TIMBER = 3, W_FLAT = 4, W_SWAT = 5, W_BLAM = 6, W_NOM = 7, W_BOINK = 8, W_STOMP = 9, W_OOF = 10, W_ZAP = 11, W_BONK = 12, W_THOOM = 13, W_HOT = 14, W_POOF = 15, W_CLANG = 16, W_DERAIL = 17, W_WHAM = 18;
+const WORDS = ["CRUNCH!", "KRAK!", "SMASH!", "TIMBER!", "FLAT!", "SWAT!", "KA-BLAM!", "NOM!", "BOINK!", "STOMP!", "OOF!", "ZZAP!", "BONK!", "KER-THOOM!", "OUCH! HOT!", "POOF!", "CLANG!", "DERAILED!", "WHAM!", "+100", "+250"];
+/** The most the rig on a wall comes forward for a side wall seen edge-on (./scene.ts wallFwd). */
+const WALL_FWD = 0.45;
+const W_CRUNCH = 0, W_TIMBER = 3, W_FLAT = 4, W_SWAT = 5, W_BLAM = 6, W_NOM = 7, W_BOINK = 8, W_STOMP = 9, W_OOF = 10, W_ZAP = 11, W_BONK = 12, W_THOOM = 13, W_HOT = 14, W_POOF = 15, W_CLANG = 16, W_DERAIL = 17, W_WHAM = 18, W_P100 = 19, W_P250 = 20;
 const TOD = ["DAY", "DUSK", "NIGHT"];
 /** Bits of facade knocked off: they fall to the street and stay there as rubble (until the city changes). */
 const BITS = 180;
@@ -270,7 +273,10 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         const fid = id + "f" + fl;
         fs.push(dio.add({ id: fid, size: [w, 1, DEPTH], pos: [0, fl, 0], on: id, color: P.walls[lk]!, pick: false, layer: 5, mask: 51 }));
         sides(fid, w, 1, DEPTH, -1, P.walls[lk]!, 5);
-        dio.add({ size: [w + 0.12, mark ? 0.14 : 0.09, DEPTH + 0.12], pos: [0, -0.09, 0], on: fid, color: P.ledge[lk]!, pick: false, layer: 6, mask: 51 });
+        // The ledge: a lip along the front only (the held front comes forward over the rig, ./monster.ts HELD;
+        // a full-depth slab there sliced through a monster behind the front corner at a side camera), its
+        // ends with the side walls.
+        dio.add({ size: [w + 0.12, mark ? 0.14 : 0.09, 0.22], pos: [0, -0.09, DEPTH / 2 - 0.05], on: fid, color: P.ledge[lk]!, pick: false, layer: 6, mask: 51 });
         sides(fid, w + 0.12, mark ? 0.14 : 0.09, DEPTH + 0.12, -0.09, P.ledge[lk]!, 6);
         for (let col = 0; col < w; col++) {
           const i = C0[b]! + fl * w + col, gf = fl === 0, door = gf && col === ((w / 2) | 0);
@@ -283,10 +289,13 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       // The roof: a parapet, its furniture (a live antenna where the round says), a vent; the landmark's crown.
       const rid = id + "r";
       roofs.push(dio.add({ id: rid, shape: "group", size: [w, 0, DEPTH], pos: [0, f, 0], on: id, pick: false }));
-      dio.add({ size: [w + 0.16, 0.22, DEPTH + 0.16], pos: [0, 0, 0], on: rid, color: P.roof, pick: false, layer: 6, mask: 51 });
+      // The roof slab and its furniture sort with the side walls (behind a rig on a wall: his head over the
+      // roof, never the tank or the slab over him); a lip along the front stays with the facade.
+      dio.add({ size: [w + 0.16, 0.22, DEPTH + 0.16], pos: [0, 0, 0], on: rid, color: P.roof, cluster: cl + "s", pick: false, layer: 6, mask: 51 });
+      dio.add({ size: [w + 0.16, 0.22, 0.24], pos: [0, 0, DEPTH / 2 - 0.04], on: rid, color: P.roof, pick: false, layer: 6.1, mask: 51 });
       sides(rid, w + 0.16, 0.22, DEPTH + 0.16, 0, P.roof, 6);
       const R = (s: number[], p: number[], col: string, o: { shape?: "box" | "cyl" | "wedge" | "prism"; sides?: number; top?: number; emissive?: boolean; rot?: number[] } = {}) =>
-        dio.add({ shape: o.shape ?? "box", sides: o.sides, top: o.top, size: s, pos: p, rot: o.rot, on: rid, color: col, emissive: o.emissive, pick: false, layer: 7 });
+        dio.add({ shape: o.shape ?? "box", sides: o.sides, top: o.top, size: s, pos: p, rot: o.rot, on: rid, color: col, emissive: o.emissive, cluster: cl + "s", pick: false, layer: 7 });
       if (mark) crown(cty, R, w, f);
       else {
         const kit = cty.roofs[(b + ci) % cty.roofs.length]!;
@@ -540,12 +549,22 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     return moving;
   }
 
+  /** v11 (owner: "he needs to shift forward based on the building angle"): on a wall the rig sits further
+   *  forward, towards the front corner, the less of the side wall the camera sees (seen edge-on, or from the
+   *  far side, a rig set back sinks into the building and the ledges slice it); with the side wall well in
+   *  view it stays set back. From the camera against the building's corner, per frame: render only. */
+  function wallFwd(O: Float64Array) {
+    const b = O[12]!, s = O[22]!, edge = s < 0 ? run.BLD[b * 4]! : run.BLD[b * 4]! + run.BLD[b * 4 + 1]!, y = O[1]! + HAND;
+    if (b < 0 || !dio.project(edge, y, 0, tmp) || !dio.project(edge, y, -DEPTH, tmp2)) return 0;
+    const side = (tmp2[0]! - tmp[0]!) * s, win = dio.project(edge - s, y, 0, tmp2) ? Math.abs(tmp2[0]! - tmp[0]!) : 1;
+    return WALL_FWD * Math.max(0, Math.min(1, 1 - side / (win * 1.2)));
+  }
   function pose(dt: number) {
     const B = run.B, BLD = run.BLD, C0 = run.C0;
     for (let k = 0; k < NM; k++) {
       const O = MV[k]!, m = mons[k]!, inPlay = O[24] === IN, small = O[29] && O[1]! <= 0.01;
       m.root.alpha = inPlay && !small ? 1 : 0;
-      if (inPlay) m.pose(O, engine.time + k * 1.7, dt);
+      if (inPlay) m.pose(O, engine.time + k * 1.7, dt, undefined, O[5] === CLIMB ? wallFwd(O) : 0);
       runners.a[k] = inPlay && small ? 1 : 0;
       runners.x[k] = O[0]!; runners.y[k] = 0.35; runners.z[k] = O[2]!; runners.r[k] = 0.5;
     }
@@ -857,7 +876,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       } else if (type === E_HELI) {
         engine.events.emit("heli");
         const o = (val | 0) * 12;
-        if (at(run.HE[o + 1]!, run.HE[o + 2]!, run.HE[o + 3]!)) fx.word(tmp[0]!, tmp[1]! - 20, W_SWAT, 5, 22), fx.blast(tmp[0]!, tmp[1]!, 0.45, 4);
+        if (at(run.HE[o + 1]!, run.HE[o + 2]!, run.HE[o + 3]!)) fx.word(tmp[0]!, tmp[1]! - 20, W_SWAT, 5, 22), fx.word(tmp[0]!, tmp[1]! - 46, W_P250, 1, 16), fx.blast(tmp[0]!, tmp[1]!, 0.45, 4);
+        pops++;
         W.burst(rnd, run.HE[o + 1]!, run.HE[o + 2]!, run.HE[o + 3]!, 1, P.heli);
         toast("SWATTED!", "clean");
         say("Helicopter swatted");
@@ -886,7 +906,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       else if (type === E_NOM) {
         engine.events.emit("nom");
         mouth(S[15]!);
-        if (at(tmp2[0]!, tmp2[1]!, tmp2[2]!)) fx.word(tmp[0]!, tmp[1]! - 16, W_NOM, 5, 20);
+        // v11: every grab pops, where it was eaten (at the mouth): NOM! and the points floating up.
+        if (at(tmp2[0]!, tmp2[1]!, tmp2[2]!)) fx.word(tmp[0]!, tmp[1]! - 16, W_NOM, 5, 22), fx.word(tmp[0]!, tmp[1]! - 42, W_P100, 1, 16);
+        pops++;
         if (mine(S[15]!)) toast("NOM! +HP", "clean"), say("Snack: health back");
         else toast(`${who(S[15]!)} ATE ONE!`, "meh");
       } else if (type === E_BURN) {
@@ -1596,7 +1618,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   // ---- taps and clicks: the target, the reach outline ----
   /** A tap waiting for the next input read: 1 a punch, 2 a grab, and its target; the cell lit by it, the
    *  mouse's cell, a miss's ring. */
-  let tapK = 0, tapT = 0, tapF = 0, hoverC = -1, hoverG = false, hoverT = 0, missF = 0, missX = 0, missY = 0;
+  let tapK = 0, tapT = 0, tapF = 0, hoverC = -1, hoverG = false, hoverT = 0, missF = 0, missX = 0, missY = 0, pops = 0, hint = "", tapFace = 0;
   /** This screen's own monster (online its seat's, else seat one's). */
   function own() {
     if (net) return MV[net.seat]!;
@@ -1619,8 +1641,10 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     return -1;
   }
   /** Grab cell g of monster O on screen into TQ; false off screen. */
-  function grabRect(O: Float64Array, g: number) {
+  function grabRect(O: Float64Array, g: number, flip = false) {
+    if (flip) O[6] = -O[6]!;
     run.grabCell(O, g);
+    if (flip) O[6] = -O[6]!;
     const x = run.GC[0]!, y = run.GC[1]!;
     if (!dio.project(x - 0.46, y + 0.46, 0.05, tmp) || !dio.project(x + 0.46, y - 0.46, 0.05, tmp2)) return false;
     TQ[0] = tmp[0]!; TQ[1] = tmp[1]!; TQ[2] = tmp2[0]!; TQ[3] = tmp2[1]!;
@@ -1633,31 +1657,60 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   function tapAt(x: number, y: number) {
     const O = own(), fc = dio.focal(), near = (wx: number, wy: number, wz: number, r: number) => dio.project(wx, wy, wz, tmp) && Math.hypot(tmp[0]! - x, tmp[1]! - y) < Math.max(22, (fc * r) / tmp[2]!);
     if (O[24] !== IN || O[5] === KO) return 0;
-    const HE = run.HE, CH = run.CH, SO = run.SO;
-    for (let h = 0; h < NH; h++) if (HE[h * 12] === 1 && near(HE[h * 12 + 1]!, HE[h * 12 + 2]!, HE[h * 12 + 3]!, 1.4)) return run.inGrab(O, HE[h * 12 + 1]!, HE[h * 12 + 2]!, true) ? T_HELI + h : T_MISS;
-    for (let k = 0; k < NCH; k++) if (CH[k * 9]! > 0 && !CH[k * 9 + 7] && near(CH[k * 9 + 1]!, CH[k * 9 + 2]!, CH[k * 9 + 3]!, 0.8)) return run.inGrab(O, CH[k * 9 + 1]!, CH[k * 9 + 2]!) ? T_CHUTE + k : T_MISS;
-    for (let k = 0; k < NS; k++) if (SO[k * 8]! > 0 && near(SO[k * 8 + 1]!, 0.8, SO[k * 8 + 2]!, 0.8)) return run.inGrab(O, SO[k * 8 + 1]!, 0.8) ? T_SOLDIER + k : T_MISS;
+    const HE = run.HE, CH = run.CH, SO = run.SO, off = O[5] !== CLIMB;
+    // v11: the reach is the facing hand's (./round.ts GRAB); off a wall something behind him in the reach
+    // he would have turned round is still his: he turns, then grabs (or swats).
+    const inBoth = (wx: number, wy: number, heli = false) => {
+      if (run.inGrab(O, wx, wy, heli)) return true;
+      if (!off || (wx - O[0]!) * O[6]! >= 0) return false;
+      O[6] = -O[6]!;
+      const ok = run.inGrab(O, wx, wy, heli);
+      O[6] = -O[6]!;
+      return ok;
+    };
+    for (let h = 0; h < NH; h++) if (HE[h * 12] === 1 && near(HE[h * 12 + 1]!, HE[h * 12 + 2]!, HE[h * 12 + 3]!, 1.4)) return inBoth(HE[h * 12 + 1]!, HE[h * 12 + 2]!, true) ? T_HELI + h : T_MISS;
+    for (let k = 0; k < NCH; k++) if (CH[k * 9]! > 0 && !CH[k * 9 + 7] && near(CH[k * 9 + 1]!, CH[k * 9 + 2]!, CH[k * 9 + 3]!, 0.8)) return inBoth(CH[k * 9 + 1]!, CH[k * 9 + 2]!) ? T_CHUTE + k : T_MISS;
+    for (let k = 0; k < NS; k++) if (SO[k * 8]! > 0 && near(SO[k * 8 + 1]!, 0.8, SO[k * 8 + 2]!, 0.8)) return inBoth(SO[k * 8 + 1]!, 0.8) ? T_SOLDIER + k : T_MISS;
     const k = cellAt(O, x, y);
     if (k >= 0) {
       const i = run.reachCell(O, k), o = run.occ[i]!;
       return o && run.cell[i] !== HOLE ? T_GRAB + k : T_CELL + k;
     }
-    // Someone at a window in the grab's reach (the next building across the gap, above, below).
-    for (let g = 0, n = run.grabCount(O); g < n; g++) {
-      if (!grabRect(O, g) || !inTQ(x, y)) continue;
-      const i = run.winAt(run.GC[0]!, run.GC[1]!);
-      if (i >= 0 && run.occ[i] && run.cell[i] !== HOLE) return T_GRAB + g;
-    }
-    if (O[5] !== CLIMB) {
+    // Someone at a window in the grab's reach (on a wall: above, below, across; off it: the front fan, then
+    // the one behind him).
+    for (let back = 0; back < (off ? 2 : 1); back++)
+      for (let g = 0, n = run.grabCount(O); g < n; g++) {
+        if (!grabRect(O, g, back === 1) || !inTQ(x, y)) continue;
+        if (back) O[6] = -O[6]!;
+        run.grabCell(O, g);
+        if (back) O[6] = -O[6]!;
+        const i = run.winAt(run.GC[0]!, run.GC[1]!);
+        // (never one his own body covers on screen: what you can't see, you can't pick)
+        if (i >= 0 && run.occ[i] && run.cell[i] !== HOLE && !(off && underBody(O, x, y))) return (back ? T_BACK : T_GRAB) + g;
+      }
+    if (off) {
+      // The bottom floor's windows from the street, in front (or behind: he turns).
+      for (let back = 0; back < 2; back++)
+        for (let j = 0; j < NLOW; j++) {
+          if (back) O[6] = -O[6]!;
+          const i = run.lowCell(O, j);
+          if (back) O[6] = -O[6]!;
+          if (i >= 0 && winRect(i) && inTQ(x, y)) return T_LOW + back * NLOW + j;
+        }
       // Off a wall: a tap within reach either way punches that way (the street's soldiers, the tank, the trucks).
-      for (let g = 0; g < NG; g++) if (grabRect(O, g) && inTQ(x, y)) return T_STREET + (run.GC[0]! > O[0]! ? 1 : 0);
+      for (let back = 0; back < 2; back++) for (let g = 0; g < NG; g++) if (grabRect(O, g, back === 1) && inTQ(x, y)) return T_STREET + ((back ? -O[6]! : O[6]!) > 0 ? 1 : 0);
     }
     return T_MISS;
+  }
+  /** Is screen point (x, y) on monster O's own body (its torso, as drawn)? */
+  function underBody(O: Float64Array, x: number, y: number) {
+    const tor = mons[MV.indexOf(O)]!.tor.M;
+    return dio.project(tor[9]!, tor[10]!, tor[11]!, tmp2) && Math.hypot(x - tmp2[0]!, y - tmp2[1]!) < (dio.focal() * 0.9) / tmp2[2]!;
   }
   /** Is a grabbable under (x, y) (someone at a window, a parachute, a soldier)? The mouse shows the grab's reach then. */
   function grabbableAt(x: number, y: number) {
     const t = tapAt(x, y);
-    if (t >= T_GRAB && t < T_HELI || t >= T_CHUTE && t < T_STREET) return true;
+    if (t > 0 && pickKind(t) === 2) return true;
     // Out of reach too: someone at a window under the pointer.
     for (let b = 0; b < run.nb(); b++) {
       const w = run.BLD[b * 4 + 1]!, f = run.BLD[b * 4 + 2]!;
@@ -1688,13 +1741,24 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
       }
     }
-    // The grab's reach (all four sides), faint and dashed, while the mouse is on something to grab.
-    if (hoverG && O[24] === IN && O[5] !== KO && !so.attract) {
+    // The grab's reach (from the facing hand: in front, above, below), only where it helps: while the mouse
+    // is on something to grab, or for a moment after a grab tap or a miss (a phone has no hover). Over the
+    // finished frame; a cell the monster's own body covers on screen is skipped (it can't be told apart).
+    if ((hoverG || (tapF > 0 && pickKind(tapT) === 2) || missF > 0) && O[24] === IN && O[5] !== KO && !so.attract) {
+      const tor = mons[MV.indexOf(O)]!.tor.M;
+      const onT = dio.project(tor[9]!, tor[10]!, tor[11]!, tmp2), tx = tmp2[0]!, ty = tmp2[1]!, tr = onT ? (dio.focal() * 0.9) / tmp2[2]! : 0;
       ctx.setLineDash(DASH);
-      ctx.strokeStyle = TRIMS[look.trim]?.c ?? P.zap;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.3;
-      for (let g = 0, n = run.grabCount(O); g < n; g++) if (grabRect(O, g)) ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
+      ctx.strokeStyle = P.pickGrab;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.55;
+      // (the side it is about to turn to, for something behind it)
+      const bk = (t: number) => t >= T_BACK && t < T_BACK + NG, flipR = (hoverG && bk(hoverT)) || (tapF > 0 && bk(tapT) && O[6] === tapFace);
+      for (let g = 0, n = run.grabCount(O); g < n; g++) {
+        if (!grabRect(O, g, flipR)) continue;
+        const cx = (TQ[0]! + TQ[2]!) / 2, cy = (TQ[1]! + TQ[3]!) / 2;
+        if (Math.hypot(cx - tx, cy - ty) < tr) continue;
+        ctx.strokeRect(TQ[0]!, TQ[1]!, TQ[2]! - TQ[0]!, TQ[3]! - TQ[1]!);
+      }
       ctx.setLineDash(NODASH);
     }
     // The pick: what a tap or click chose, lit until the action lands (green: a punch, teal: a grab); the
@@ -1709,21 +1773,39 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       ctx.strokeStyle = P.pickFar;
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(missX, missY, 10 + (0.6 - missF) * 20 * calm, 0, TAU);
+      ctx.arc(missX, missY, 10 + Math.max(0, 0.6 - missF) * 20 * calm, 0, TAU);
       ctx.stroke();
       ctx.font = `900 ${fs}px ui-rounded, system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.lineWidth = 3;
       ctx.strokeStyle = P.ink;
       ctx.fillStyle = P.pickFar;
-      const ty = missY - 18 - (0.6 - missF) * 14 * calm;
+      const ty = missY - 18 - Math.max(0, 0.6 - missF) * 14 * calm;
       ctx.strokeText("TOO FAR", missX, ty);
       ctx.fillText("TOO FAR", missX, ty);
+      // Where to stand: a short arrow from the monster towards the tap, and the hint under the ring.
+      if (dio.project(O[0]!, O[1]! + 0.4, O[2]!, tmp2)) {
+        const ax = tmp2[0]!, ay = tmp2[1]!, dx = missX - ax, dy = missY - ay, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, L = Math.min(56, d * 0.45), s0 = 26;
+        ctx.strokeStyle = P.pickFar;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(ax + ux * s0, ay + uy * s0);
+        ctx.lineTo(ax + ux * (s0 + L), ay + uy * (s0 + L));
+        ctx.lineTo(ax + ux * (s0 + L - 12) - uy * 9, ay + uy * (s0 + L - 12) + ux * 9);
+        ctx.moveTo(ax + ux * (s0 + L), ay + uy * (s0 + L));
+        ctx.lineTo(ax + ux * (s0 + L - 12) + uy * 9, ay + uy * (s0 + L - 12) - ux * 9);
+        ctx.stroke();
+      }
+      ctx.font = `800 ${fs - 3}px ui-rounded, system-ui, sans-serif`;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = P.ink;
+      ctx.strokeText(hint, missX, missY + 30);
+      ctx.fillText(hint, missX, missY + 30);
     }
     ctx.globalAlpha = 1;
   }
   /** What target t will do: 1 a punch (a window, a helicopter's swat, the street), 2 a grab, 3 nothing (out of reach). */
-  const pickKind = (t: number) => (t === T_MISS ? 3 : (t >= T_GRAB && t < T_HELI) || (t >= T_CHUTE && t < T_STREET) ? 2 : 1);
+  const pickKind = (t: number) => (t === T_MISS ? 3 : isPunch(t) ? 1 : 2);
   /** Light target t of monster O: its cell (a window, a grab cell) or a ring on the thing (a helicopter, a
    *  parachute, a soldier), in the colour of what it will do; `a` 1 the pick, 0.5 the hover's preview (a thinner line, a fainter fill). */
   function pick(ctx: CanvasRenderingContext2D, O: Float64Array, t: number, a: number, x: number, y: number) {
@@ -1731,6 +1813,14 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     let ok = false, rr = 0;
     if (t >= T_CELL && t < T_GRAB) ok = run.reachCell(O, t - T_CELL) >= 0 && winRect(run.reachCell(O, t - T_CELL));
     else if (t >= T_GRAB && t < T_HELI) ok = grabRect(O, t - T_GRAB);
+    else if (t >= T_BACK && t < T_BACK + NG) ok = grabRect(O, t - T_BACK, a < 1 || O[6] === tapFace);
+    else if (t >= T_LOW && t < T_LOW + 2 * NLOW) {
+      const back = t >= T_LOW + NLOW;
+      if (back) O[6] = -O[6]!;
+      const i = run.lowCell(O, (t - T_LOW) % NLOW);
+      if (back) O[6] = -O[6]!;
+      ok = i >= 0 && winRect(i);
+    }
     else if (t >= T_HELI && t < T_STREET) {
       const H = run.HE, C = run.CH, So = run.SO;
       const q = t < T_CHUTE ? (t - T_HELI) * 12 : t < T_SOLDIER ? (t - T_CHUTE) * 9 : (t - T_SOLDIER) * 8;
@@ -1844,12 +1934,14 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       if (toastT > 0) (toastT = Math.max(0, toastT - dt)), (moving = true), toastT === 0 && (toastEl.hidden = true);
       if (tapF > 0 || missF > 0) {
         // The pick stays lit until its action lands (the punch's hit frame, the grab's reach), then fades.
-        const O = own(), waiting = tapK !== 0 || O[43] === tapT || O[44] === tapT || O[34]! > 0 || O[10]! > 0.55;
+        const O = own(), waiting = tapK !== 0 || O[43] === tapT || O[44] === tapT || O[49]! > 0 || O[34]! > 0 || O[10]! > 0.55;
         tapF = Math.max(0, waiting ? Math.max(tapF - dt, 0.12) : Math.min(tapF, 0.12) - dt);
         missF = Math.max(0, missF - dt);
         moving = true;
       }
-      if (S[0] === RUN || S[0] === CLEAR || (net && S[0] !== DONE)) moving = true;
+      // Online the link steps every frame, the end included: a run that ends here (the last player on this screen
+      // shrunk) must not put the engine to sleep, or the final frames stop for every screen (tests/online.mjs).
+      if (S[0] === RUN || S[0] === CLEAR || net) moving = true;
       if (!net && S[0] === DONE && run.step(0, INP)) moving = true;
       if (moving || dirty) e.busy(), (dirty = true), (hudDirty = true);
       lastDt = dt;
@@ -1896,10 +1988,17 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     auto = false;
     const r = canvas.getBoundingClientRect(), t = tapAt(e.clientX - r.left, e.clientY - r.top);
     if (t <= 0) return;
-    tapK = (t >= T_CELL && t < T_GRAB) || (t >= T_HELI && t < T_CHUTE) || t >= T_STREET ? 1 : 2;
+    tapK = isPunch(t) ? 1 : 2;
     tapT = t;
     tapF = 0.7;
-    if (t === T_MISS) (missX = e.clientX - r.left), (missY = e.clientY - r.top), (missF = 0.6);
+    tapFace = own()[6]!;
+    if (t === T_MISS) {
+      (missX = e.clientX - r.left), (missY = e.clientY - r.top), (missF = 1.1);
+      // The hint: which way to go to get it in reach.
+      const O = own(), wall = O[5] === CLIMB;
+      hint = dio.project(O[0]!, O[1]! + 2, O[2]!, tmp2) && wall && Math.abs(missY - tmp2[1]!) > Math.abs(missX - tmp2[0]!) ? (missY < tmp2[1]! ? "CLIMB UP" : "CLIMB DOWN") : "MOVE CLOSER";
+      say("Too far: " + hint.toLowerCase());
+    }
     engine.wake();
   }, sig);
   play.addEventListener("pointermove", (e) => {
@@ -1927,6 +2026,12 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     get auto() {
       return auto;
     },
+    /** v11: pops shown for grabs and swats so far, and the last TOO FAR's hint (tests). */
+    get feedback() {
+      return { pops, hint, miss: missF > 0, tap: tapT };
+    },
+    /** What a tap at canvas point (x, y) would do (a target code, ./round.ts T_*). */
+    tapAt,
     /** A practice run (./round.ts S[28]). */
     get practice() {
       return S[28] === 1;

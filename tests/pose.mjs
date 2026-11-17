@@ -133,8 +133,9 @@ try {
       for (let k = 0; k < 4; k++) {
         for (let j = 0; j < 4; j++) (r.MV[j][24] = j === k ? 1 : 0), (r.MV[j][28] = 9);
         r.MV[k][28] = 0;
-        const b = 1, x0 = r.BLD[b * 4], wd = r.BLD[b * 4 + 1], m = sc.rig(k);
-        for (const s of [-1, 1]) for (const climb of [0, 0.35, 0.7]) {
+        const m = sc.rig(k);
+        // Building 1, and building 3: the deep-ledge one with the rooftop water tank (v11, owner screenshots 163, 166).
+        for (const [b, x0, wd] of [1, 3].map((bb) => [bb, r.BLD[bb * 4], r.BLD[bb * 4 + 1]])) for (const s of [-1, 1]) for (const climb of [0, 0.35, 0.7]) {
           r.SO.fill(0); r.PB.fill(0); r.HE[8] = r.HE[20] = 1e9; r.TK[0] = 0; r.TK[4] = 1e9; r.HE[0] = r.HE[12] = 0;
           r.cell.fill(2); r.HIT.fill(0); r.B.fill(0); r.LIVE.fill(0); r.occ.fill(0);
           const M = r.MV[k], fl = 3;
@@ -189,7 +190,7 @@ try {
             const A = on[d], B = off[d], C = on2[d], dd = (X, Y, q) => Math.abs(X[q] - Y[q]) + Math.abs(X[q + 1] - Y[q + 1]) + Math.abs(X[q + 2] - Y[q + 2]);
             let diff = 0;
             for (let q = 0; q < A.length; q += 4) if (dd(A, C, q) <= 24 && dd(A, B, q) > 24) diff++;
-            out.push({ k, s, climb, d, cover: +(diff / (A.length / 4)).toFixed(3) });
+            out.push({ k, b, s, climb, d, cover: +(diff / (A.length / 4)).toFixed(3) });
           }
         }
       }
@@ -198,7 +199,7 @@ try {
     });
     for (const o of clear) if ("click" in o) assert.ok(o.click, `${w}: side ${o.s}: a click on reach cell ${o.d}'s centre punches that window (${JSON.stringify(o)})`);
     if (process.env.POSE_DEBUG) console.log(JSON.stringify(clear.filter((o) => !("click" in o)).map((o) => o.cover)));
-    for (const o of clear) if (!("click" in o)) assert.ok(o.cover <= 0.05, `${w}: monster ${o.k}, side ${o.s}, ${o.climb ? "mid-climb" : "at rest"}: reach cell ${o.d} is clear of the monster (${(o.cover * 100).toFixed(1)}% of it covered)`);
+    for (const o of clear) if (!("click" in o)) assert.ok(o.cover <= 0.05, `${w}: monster ${o.k}, building ${o.b}, side ${o.s}, ${o.climb ? "mid-climb" : "at rest"}: reach cell ${o.d} is clear of the monster (${(o.cover * 100).toFixed(1)}% of it covered)`);
     await p.close();
   }
   console.log("CitySmash: the rig green (four monsters, both edges, the seven reach cells: side-on on the side wall behind the front, chest to the wall, far hand and feet on the side wall, the fist on the window the round hits, in front; the far punch brings the body towards the camera and round the front corner; the reach clear of the monster at rest and mid-climb, a click on each cell punches it; at 1440 and 390).");

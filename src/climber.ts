@@ -17,6 +17,8 @@ export const MK = 1.3;
 export const ZS = 1.9, ZW = -0.55, ZR = -1.45;
 /** Hanging: the hand over the feet, how far under the roof the feet stop. */
 export const HAND = 1.9, CLIMB_TOP = 1.6;
+/** Down held at the bottom of a wall this long lets go (a moment: the bottom floor stays in reach). */
+export const DROP_HOLD = 0.3;
 export const G = 26;
 /** A monster in play, waiting to come in, or out. */
 export const OUT = 0, IN = 1, WAIT = 2;
@@ -56,7 +58,8 @@ export function createClimber(bk: Block, h: ClimberHooks) {
   /** One step of monster M (its index `k`, for the events), with the stick (mx, my up) and a jump press. */
   function step(M: Float64Array, k: number, dt: number, mx: number, my: number, jump: number, hero: boolean) {
     const md = M[5]!, SX = bk.L[3]!;
-    if (Math.abs(mx) > 0.25 && md !== KO && md !== CLIMB) M[6] = mx > 0 ? 1 : -1;
+    // (Not while it turns round for a grab behind it, ./round.ts TURN_T.)
+    if (Math.abs(mx) > 0.25 && md !== KO && md !== CLIMB && !(M[49]! > 0)) M[6] = mx > 0 ? 1 : -1;
     M[8] = Math.max(0, M[8]! - dt); M[11] = Math.max(0, M[11]! - dt); M[14] = Math.max(0, M[14]! - dt); M[15] = Math.max(0, M[15]! - dt); M[18] = Math.max(0, M[18]! - dt);
     M[9] = Math.max(0, M[9]! - dt * 4.5); M[10] = Math.max(0, M[10]! - dt * 3.5); M[19] = Math.max(0, M[19]! - dt * 5); M[23] = Math.max(0, M[23]! - dt);
     if (md === WALK) {
@@ -127,7 +130,9 @@ export function createClimber(bk: Block, h: ClimberHooks) {
         M[19] = 0.6;
         return void h.emit(E_LAND, 2);
       }
-      if (M[1]! <= 0.05 && mv < -0.3 && M[33]! < -0.3) return void ((M[1] = 0), (M[5] = WALK), (M[12] = -1), (M[33] = 0));
+      // At the bottom it stops (the bottom floor in reach: the down cells); held down a moment more, it lets go.
+      M[48] = M[1]! <= 0.05 && mv < -0.3 ? M[48]! + dt : 0;
+      if (M[48]! > DROP_HOLD && M[33]! < -0.3) return void ((M[1] = 0), (M[5] = WALK), (M[12] = -1), (M[33] = 0), (M[48] = 0));
       if (M[1]! < 0.05) M[1] = 0.05;
       if (jump) return void ((M[5] = AIR), (M[12] = -1), (M[4] = 7.5), (M[3] = s * 5.5), (M[6] = s), h.emit(E_JUMP, 1));
     } else if (md === ROOF) {

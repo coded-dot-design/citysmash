@@ -79,6 +79,8 @@ export interface RigInk { ink: string; eye: string; pupil: string; teeth: string
 export interface Wall { yaw: number; ox: number; oz: number; lean: number; lunge: number; come: number[]; far: number[]; fleg: number[]; nleg: number[]; rest: number[]; wind: number[]; hit: number[]; neck: number }
 /** The depth (z) the scene anchors a held building's cluster at: behind it only the rigs on its walls. */
 export const HELD = 0.05;
+/** On a wall the renderer's forward shift (./scene.ts wallFwd) stops with the rig's root this far back. */
+export const FWD_Z = -1.05;
 export const WALL: Wall[] = [
   // the ape
   { yaw: 0.1, ox: -0.15, oz: -0.85, lunge: 1, lean: 0.15, come: [2, 0.2, 0.2], far: [1.105, -0.541, 2.107], fleg: [0.871, -0.25, -0.006], nleg: [1.033, -0.25, 0.353], rest: [-0.759, -0.108, 1.792], wind: [3.636, -1.51, 2.7, 2.593, 1.631, 2.7, -1.65, 2.67, 1.5, 2.253, 0.442, 2.548, 2.253, 0.442, 2.548, 3.7, -0.421, 2.627, 3.7, -0.421, 2.627], hit: [-0.039, -0.862, 1.586, 1.009, -0.847, 0, 1.412, -2.024, 0.81, 1.241, 1.407, 1.679, 1.017, -1.615, 0.242, 0.047, -0.489, 0.919, 0.816, -0.443, 0], neck: -1.2 },
@@ -338,7 +340,9 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
   // reaches up, the hips push in, the body pulls up, the legs follow.
   const W = WALL[kind]!;
   let yaw = -0.35;
-  function pose(M: Float64Array, t: number, dt: number, spin?: number) {
+  /** `fwd`: on a wall, how far forward (towards the front corner, +z) the renderer sets the rig for this
+   *  frame's view of the side wall (./scene.ts wallFwd; render only, the run's state is untouched). */
+  function pose(M: Float64Array, t: number, dt: number, spin?: number, fwd = 0) {
     const md = M[5]!, f = M[6]!, ph = M[13]!, ga = M[10]!, nom = M[18]!, squash = M[19]!, zap = M[23]!;
     const wall = md === CLIMB, pt = PUNCH_CD - M[8]!, punching = M[8]! > 0 && zap <= 0;
     // On the street: three quarters to the camera. On a wall: side-on, chest to the wall.
@@ -357,7 +361,8 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     const lk = wall && punching && M[38]! === 3 ? (M[34]! > 0 ? Math.min(1, pt / PUNCH_HIT) * 0.8 : 1 - (Math.max(0, (pt - PUNCH_HIT) / (PUNCH_CD - PUNCH_HIT) - 0.3) / 0.7) ** 2) : 0;
     root.pos[0] = M[0]! + (wall ? f * (W.ox + W.lunge * lk) : 0);
     root.pos[1] = M[1]! + (wall ? (moving ? lift * 0.16 : br * 0.03) * MK : 0);
-    root.pos[2] = M[2]! + (wall ? W.oz + W.come[0]! * lk : 0);
+    // (forward only as far as keeps its feet and far hand on the side wall: the root no nearer than FWD_Z)
+    root.pos[2] = M[2]! + (wall ? W.oz + Math.min(fwd, Math.max(0, FWD_Z - M[2]! - W.oz)) + W.come[0]! * lk : 0);
     root.rot[1] = yaw;
     root.rot[2] = md === KO ? -1.35 : zap > 0 ? Math.sin(t * 60) * 0.06 : 0;
     // A shock flickers it light and dark; a hit flashes it white.
@@ -431,7 +436,15 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
       if (ga > 0 && outside && zap <= 0) {
         // The grab: out to the window, then back to the mouth.
         const k = ga > 0.5 ? (1 - ga) * 2 : 1;
-        const gj = (M[41]! > 0 ? M[41]! - 1 : 0) * 3, gr = wall ? W.hit[gj]! : 1.9, gs = wall ? s * W.hit[gj + 1]! : sp, ge = wall ? W.hit[gj + 2]! : 0.2;
+        const gj = (M[41]! > 0 ? M[41]! - 1 : 0) * 3, gs = wall ? s * W.hit[gj + 1]! : sp;
+        let gr = wall ? W.hit[gj]! : 1.9, ge = wall ? W.hit[gj + 2]! : 0.2;
+        // v11: off a wall the arm reaches for the very spot it grabs (./round.ts M[50], M[51]): straight from
+        // the shoulder, down to the street, out ahead or up over the head.
+        if (!wall && M[51]! > 0) {
+          const fw = Math.max(0.3, (M[50]! - M[0]!) * f - 0.3), up = M[51]! - M[1]! - height * MK * 0.65;
+          gr = Math.max(0.25, Math.min(2.9, Math.atan2(fw, -up)));
+          ge = 0.08;
+        }
         r = r + (gr - r) * k;
         sp = sp + (gs - sp) * (ga > 0.5 ? k : 1 - (1 - ga * 2));
         er = ga > 0.5 ? er + (ge - er) * k : er + (2.1 - er) * (1 - ga * 2);
