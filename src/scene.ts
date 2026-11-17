@@ -2114,6 +2114,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       if (hudDirty) (hudDirty = false), hudWrite();
       if (!dirty) return;
       dirty = false;
+      // Online the link steps the run after this step (its own engine system): a frame there can load the next
+      // city, so the scene catches up here before it draws (else it draws the new city's windows with the old ones).
+      if (built !== S[16]) buildScene(), frame();
       pose(lastDt);
       const cam = dio.cam, k = (shake * shake * 16 + fx.shake * 0.5) * calm, sx = Math.sin(engine.time * 71) * k, sy = Math.cos(engine.time * 53) * k * 0.7;
       (cam.ox += sx + nudge), (cam.oy += sy);
