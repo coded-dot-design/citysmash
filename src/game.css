@@ -144,3 +144,15 @@
 .cs .cs-dots{display:flex;gap:5px;margin:2px 0 0}
 .cs .cs-dots i{width:10px;height:10px;border-radius:50%;border:1.5px solid #22e6ff}
 .cs .cs-dots i.cs-done{background:#22e6ff}
+.cs .cs-story .cs-note,.cs .cs-gside .cs-note{color:#0b0a14}
+.cs .cs-story .cs-explain{margin-top:-6px;font-size:.88em;color:var(--ink)}
+.cs .cs-pads{display:grid;gap:8px}
+.cs .cs-who li{grid-template-columns:auto 1fr auto;opacity:1;border-style:dashed}
+.cs .cs-who li.cs-in{border-style:solid}
+.cs .cs-who small{grid-column:2 / -1;color:var(--ink);opacity:.85}
+.cs .cs-padmon{min-height:44px;padding:0 .7em;font:inherit;font-size:.82em}
+.cs .cs-friends{display:inline-grid;align-content:center;line-height:1.1;padding:.3em 1em!important}
+.cs .cs-friends small{font-size:.66em;letter-spacing:.06em;opacity:.85}
+.cs .cs-mons .cs-sw i{background:linear-gradient(135deg,var(--c) 55%,var(--t) 55%)}
+.cs .cs-mons .cs-sil i{background:#0b0a14;border-style:dashed}
+.cs .cs-pads .cs-who{grid-template-columns:1fr}

@@ -81,7 +81,10 @@ html.bui[data-theme="light"] .panel{box-shadow:5px 5px 0 var(--ink)}
 .cities .sky i{display:block;flex:1;border:2px solid var(--rim);border-bottom:0;border-radius:3px 3px 0 0;background:var(--w)}
 .cities .sky i.mark{flex:.8;background:var(--m)}
 .mons{grid-template-columns:repeat(4,minmax(0,1fr))}
-.mons .swatch{display:block;width:56px;height:56px;border-radius:14px;margin-bottom:10px;border:2.5px solid var(--rim);background:linear-gradient(135deg,var(--a) 0 60%,var(--b) 61%);box-shadow:4px 4px 0 var(--rim)}
+.mons .mon3d{display:block;width:100%;aspect-ratio:1 / 1;margin-bottom:10px;border:2.5px solid var(--rim);border-radius:14px;box-shadow:4px 4px 0 var(--rim);cursor:grab;touch-action:pan-y;background:var(--panel,transparent)}
+.mons .mon3d:active{cursor:grabbing}
+.mons .mon3d:focus-visible{outline:3px solid var(--hot);outline-offset:3px}
+@media (max-width:560px){.mons .mon3d{max-width:320px;margin-inline:auto}}
 @media (max-width:1000px){.cities,.mons{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.cities,.mons{grid-template-columns:1fr}}
 .dt-hero{background:#0c0a1a}

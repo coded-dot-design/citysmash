@@ -4,8 +4,8 @@
 // click out of reach is a whiff (a swing, nothing hit), two presses of J (the keyboard fallback) make the
 // hole; a click on a person in reach eats them, L eats the next; one more hole and the building shakes and
 // pancakes to rubble; the city flat brings the card and a punch loads city 2 (Coilworth), its unlocks
-// saved; the garage change and the cleared city survive a reload; a comma brings player two in as
-// SHARDCLAW and the arrows drive it; Recall gives the page back byte for byte. At 390 (touch): the pad is
+// saved; the garage change and the cleared city survive a reload; the arrows drive the ape (no
+// shared-keyboard player two: one person a device); Recall gives the page back byte for byte. At 390 (touch): the pad is
 // the stick and JUMP only, its keys are 44 px or more, the play surface has touch-action none, the stick
 // walks the ape, a tap on a window in reach chips it, a tap out of reach whiffs, a tap on a person in reach
 // eats them; portrait and landscape, every city's tallest building and the street fit the stage under
@@ -115,14 +115,13 @@ try {
   await until(p, () => game.scene.state.cityId === "coilworth" && !game.scene.state.card, null, "city 2 loads");
   const saved = await p.evaluate(() => JSON.parse(localStorage.getItem("citysmash:profile")));
   assert.deepEqual([saved.cleared, saved.owned.includes("fur:3"), saved.look.fur], [["port-lumen"], true, 1], "saved: the city, its unlocks, the fur");
-  // Player two: a comma brings SHARDCLAW in; the arrows drive it.
-  await p.keyboard.press("Comma");
-  await until(p, () => game.scene.run.MV[1][28] === 1 && game.scene.run.MV[1][24] === 1, null, "P2 is SHARDCLAW");
-  await p.evaluate(() => { game.scene.run.MV[1][0] = 0; game.scene.run.MV[1][5] = 0; });
-  const x0 = await p.evaluate(() => game.scene.run.MV[1][0]);
+  // One person a device: the arrows drive the ape too (no shared-keyboard player two).
+  await p.evaluate(() => { game.scene.run.M[5] = 0; game.scene.run.M[0] = 0; });
   await p.keyboard.down("ArrowLeft");
-  await until(p, (x0) => game.scene.run.MV[1][0] < x0 - 1, x0, "the arrows drive it");
+  await until(p, () => game.scene.run.M[0] < -1, null, "the arrows drive the ape");
   await p.keyboard.up("ArrowLeft");
+  await p.keyboard.press("Comma");
+  assert.equal(await p.evaluate(() => game.scene.run.MV[1][28]), 9, "a comma brings no player two");
   // Reload: the garage change (the hair too) and the cleared city persist.
   await p.evaluate(() => (game.setPart("hair", 2), game.setPart("hairc", 3)));
   await p.reload();
@@ -194,7 +193,7 @@ try {
     }
   }
   await ph.close();
-  console.log("CitySmash: browser green (title settles, garage + lock + code, start, climb + punch to a hole, eat, a building falls, city 2 loads, unlocks saved, 2P joins, reload persists (hair too), Recall, phone pad stick + JUMP, taps smash, whiff and eat, hero ≥ 1/5, full height at 390 portrait and landscape).");
+  console.log("CitySmash: browser green (title settles, garage + lock + code, start, climb + punch to a hole, eat, a building falls, city 2 loads, unlocks saved, the arrows drive the ape (no keyboard P2), reload persists (hair too), Recall, phone pad stick + JUMP, taps smash, whiff and eat, hero ≥ 1/5, full height at 390 portrait and landscape).");
 } finally {
   await browser.close();
   await server.close();

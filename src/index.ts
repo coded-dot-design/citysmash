@@ -5,3 +5,6 @@
 //   createCitySmash()                         a layer over the whole page; destroy() gives it back
 export { createCitySmash, type CitySmash, type CitySmashOptions } from "./game.ts";
 export { CITIES } from "./cities.ts";
+// The landing page's monster cards: the garage's turntable (already in the bundle) and the ape's default look.
+export { turntable } from "./turntable.ts";
+export { LOOK0 } from "./monster.ts";

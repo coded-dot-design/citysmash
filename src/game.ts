@@ -1,6 +1,7 @@
-// CitySmash, the shell: the title (play from any city you have reached, the players on this screen,
-// rivals on or off), the garage (the ape on a live turntable: fur, trim, pattern, face, gear, the parts
-// each city unlocks, the save code), the run (./scene.ts) and online rooms (./net.ts: host or join with
+// CitySmash, the shell: the title (play from any city you have reached, computer rivals on or off, a
+// player for each connected gamepad: one person a device, friends play online), the garage (your monster
+// on a live turntable: the ape's fur, trim, pattern, face, gear, the parts each city unlocks; a rival you
+// have beaten, in a colour and trim of your pick; the save code), the run (./scene.ts) and online rooms (./net.ts: host or join with
 // an invite code, a lobby, the run over the rollback). It owns the profile (./profile.ts): a cleared
 // city's unlocks and the run's best land in it and it is saved at once. Board UI stickers in a shadow
 // root, so the page and the game never touch each other's styles; every page write goes through the
@@ -12,9 +13,10 @@ import { lockTouch } from "@fzlt/core/touch";
 import type { Transport } from "@fzlt/core/presence";
 import { mountScene, SEAT_C, type Scene } from "./scene.ts";
 import { CITIES, NCITY } from "./cities.ts";
-import { buildMonster, heroName, shade, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS, RIVAL_WHAT, type Look, type RigInk } from "./monster.ts";
+import { heroName, shade, monName, rivalDress, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS, RIVAL_WHAT, RIVAL_C } from "./monster.ts";
+import { turntable } from "./turntable.ts";
 import { AI, NM, DONE } from "./round.ts";
-import { load, save, local, fresh, clearCity, startable, endRun, setPart, partName, unlockedBy, exportCode, importCode, type Profile, type Store, type Part } from "./profile.ts";
+import { load, save, local, fresh, clearCity, startable, endRun, setPart, partName, unlockedBy, exportCode, importCode, beat, setMon, setRival, cast, type Profile, type Store, type Part } from "./profile.ts";
 import { encode, decode, NI, packMode, unpackMode, joinRoom, rollback, lookBits, takeLook, lookOf, GONE, B_GONE, SEATS, LOOK_FRAMES, type Rollback } from "./net.ts";
 
 export interface CitySmashOptions {
@@ -31,6 +33,7 @@ export interface CitySmashOptions {
 type Screen = "menu" | "garage" | "play" | "online";
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const num = (n: number) => n.toLocaleString("en-US");
+type Tab = Part | "code" | "rc" | "rt";
 const TABS: [Part, string, number][] = [["fur", "FUR", FURS.length], ["trim", "TRIM", TRIMS.length], ["pattern", "PATTERN", PATTERNS.length], ["face", "FACE", FACES.length], ["hair", "HAIR", HAIRS.length], ["gear", "GEAR", GEAR.length]];
 const TOD = ["DAY", "DUSK", "NIGHT"];
 const ROOM_N = 16;
@@ -73,39 +76,22 @@ export function createCitySmash(o: CitySmashOptions = {}) {
   stage.append(sceneEl, cards, live);
   L.add(cards);
   const say = (s: string) => (live.textContent = s === live.textContent ? s + " " : s);
-  let screen: Screen = "menu", scene: Scene | null = null, start = 0, players = 1, tab: Part | "code" = "fur", note = "";
+  let screen: Screen = "menu", scene: Scene | null = null, start = 0, players = 1, tab: Tab = "fur", note = "";
+  /** The gamepads on this screen (up to three extra players): joined, and the monster each plays. */
+  const pads = [0, 1, 2].map((i) => ({ on: false, mon: i + 1, held: true })), PADS = { n: 0, poll: 0 };
+  const monOf = () => monName(profile.mon, profile.look);
   start = Math.max(...startable(profile));
 
   // ---- the garage turntable: the ape on a plinth, drawn on change; it turns a while after each change, and drags round ----
   const pv = document.createElement("canvas");
   pv.className = "cs-preview";
   pv.setAttribute("aria-hidden", "true");
-  const pdio = diorama(pv, { light: [-0.4, 1, 0.7], ambient: 0.56, background: () => (pageTheme() === "dark" ? "#161236" : "#efe8ff") });
-  const PM = new Float64Array(40);
-  PM[6] = 1; PM[7] = 100; PM[24] = 1;
-  let pvKey = "", pvMon: ReturnType<typeof buildMonster> | null = null, turn = -0.5, spinTo = 0;
+  const tt = turntable(pv, pageTheme), pdio = tt.dio;
+  let pvKey = "", turn = -0.5, spinTo = 0;
   function preview() {
     if (!pv.isConnected) return;
-    const r = pv.getBoundingClientRect(), w = Math.round(r.width), h = Math.round(r.height);
-    if (w < 10 || h < 10) return;
-    const key = JSON.stringify([w, h, profile.look, pageTheme()]);
-    if (key !== pvKey) {
-      pvKey = key;
-      pdio.resize(w, h, Math.min(2, devicePixelRatio || 1));
-      pdio.clear();
-      // The plinth draws first (under the ape at every turn: the depth sort would put it over the far leg).
-      pdio.cluster("pl", { fixed: 0 });
-      const night = pageTheme() === "dark";
-      pdio.add({ shape: "cyl", sides: 10, size: [5.4, 0.3, 5.4], pos: [0, -0.3, 0], color: night ? "#2a2552" : "#d8ccf4", pick: false, cluster: "pl" });
-      pdio.add({ shape: "cyl", sides: 10, size: [5.6, 0.08, 5.6], pos: [0, -0.36, 0], color: night ? "#22e6ff" : "#ff4fa8", emissive: night, pick: false, cluster: "pl" });
-      const ink: RigInk = night ? { ink: "#0b0a14", eye: "#fff6c9", pupil: "#0b0a14", teeth: "#f6f3ff", night: true, metal: "#9aa3c8" } : { ink: "#1b1420", eye: "#ffffff", pupil: "#1b1420", teeth: "#ffffff", night: false, metal: "#b8bfd8" };
-      pvMon = buildMonster(pdio, 0, profile.look, ink, "pv");
-      Object.assign(pdio.cam, { yaw: 0, pitch: 0.14, dist: 14, tx: 0, ty: 2.3, tz: 0, ox: 0, oy: 0, fov: 0.5 });
-    }
-    if (pvMon) {
-      pvMon.pose(PM, engine.time, 1, turn);
-      pdio.draw();
-    }
+    if (pvKey === "") tt.invalidate(), (pvKey = "x");
+    tt.draw(profile.mon, profile.look, profile.mon ? rivalDress(profile.mon, profile.rlook) : null, turn, engine.time);
   }
   const pro = new ResizeObserver(() => ((pvKey = ""), preview()));
   pro.observe(pv);
@@ -122,30 +108,72 @@ export function createCitySmash(o: CitySmashOptions = {}) {
   engine.add({
     step(e, dt) {
       if (screen === "garage" && spinTo > e.time) (turn += dt * 1.6), e.busy(), preview();
+      // The menu watches the gamepads (only once one has shown up): each connected pad is a slot; a press joins it.
+      if (screen === "menu" && PADS.poll) {
+        e.busy();
+        const all = [...(navigator.getGamepads?.() ?? [])].filter((g): g is Gamepad => !!g && g.connected).slice(0, 3);
+        let ch = all.length !== PADS.n;
+        all.forEach((g, i) => {
+          const q = pads[i]!, down = g.buttons.some((b) => b.pressed);
+          if (down && !q.held && !q.on) (q.on = true), (ch = true), say(`Gamepad ${i + 1} joined as ${monName(q.mon, profile.look)}`);
+          q.held = down;
+        });
+        for (let i = all.length; i < 3; i++) pads[i]!.on = false;
+        PADS.n = all.length;
+        if (!PADS.n) PADS.poll = 0;
+        if (ch) paint();
+      }
     },
   });
+  const padsOn = () => ((PADS.poll = 1), engine.wake());
+  addEventListener("gamepadconnected", padsOn, sig);
+  addEventListener("gamepaddisconnected", padsOn, sig);
+  try {
+    if ([...(navigator.getGamepads?.() ?? [])].some((g) => g && g.connected)) PADS.poll = 1;
+  } catch {}
   const spin = () => ((spinTo = engine.time + (matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 2.4)), engine.busy(2.5), engine.wake());
 
   // ---- the cards ----
   const owns = (k: Part, i: number) => profile.owned.includes(`${k}:${i}`);
-  const head = () => `<header class="cs-bar"><b class="cs-logo">CITY<i>SMASH</i></b><span class="cs-chip">${esc(heroName(profile.look.fur, profile.look.face))}</span><span class="cs-chip">BEST ${num(profile.best)}</span><span class="cs-chip">CITIES ${profile.cleared.length}/${NCITY}</span></header>`;
+  const head = () => `<header class="cs-bar"><b class="cs-logo">CITY<i>SMASH</i></b><span class="cs-chip">${esc(monOf())}</span><span class="cs-chip">BEST ${num(profile.best)}</span><span class="cs-chip">CITIES ${profile.cleared.length}/${NCITY}</span></header>`;
   function menuCard() {
     const can = startable(profile);
     const cities = CITIES.map((c, i) => {
       const open = can.includes(i), done = profile.cleared.includes(c.id);
       return `<li><button type="button" class="bui-key cs-cityk${i === start ? " cs-on" : ""}" data-start="${i}" aria-pressed="${i === start}"${open ? "" : " disabled"}><small>${i + 1} · ${TOD[c.tod]}</small><b>${esc(c.name)}</b><span>${open ? esc(c.featureName) : "LOCKED"}${done ? " · ★" : ""}</span></button></li>`;
     }).join("");
-    const who = [0, 1, 2, 3].map((s) => `<li class="${s < players ? "cs-in" : ""}" style="--seat:${SEAT_C[s]}"><i>P${s + 1}</i><b>${s === 0 ? esc(heroName(profile.look.fur, profile.look.face)) : RIVALS[s - 1]}</b><small>${s === 0 ? "WASD · SPACE · K · L" : s === 1 ? "ARROWS · , . /" : "GAMEPAD " + (s + 1)}</small></li>`).join("");
-    return `<section class="cs-screen cs-menu" aria-label="CitySmash">${head()}<div class="cs-mbody"><div class="cs-story"><h2>Climb it. Smash it. Eat the snacks.</h2><p>You are a giant cyber ape. Jump at a building's side and hang on: your inside arm grips, your outside arm smashes the windows by your climb. Three hits a window. Enough holes and the whole thing pancakes. Seven cities, day into night.</p><div class="cs-actions"><button type="button" class="bui-key bui-go cs-big" data-play>▶ SMASH ${esc(CITIES[start]!.name)}</button><button type="button" class="bui-key" data-practice>PRACTICE</button><button type="button" class="bui-key" data-go="garage">GARAGE</button><button type="button" class="bui-key" data-go="online">ONLINE</button></div><p class="cs-sub">PLAYERS ON THIS SCREEN</p><p class="cs-sizes" role="group" aria-label="Players on this screen">${[1, 2, 3, 4].map((n) => `<button type="button" class="bui-key" data-players="${n}" aria-pressed="${n === players}">${n}P</button>`).join("")}<button type="button" class="bui-key cs-riv" data-rivals aria-pressed="${!!profile.rivals}">RIVALS ${profile.rivals ? "ON" : "OFF"}</button></p><ol class="cs-who">${who}</ol>${note ? `<p class="cs-note">${esc(note)}</p>` : ""}</div><ol class="cs-cities" aria-label="Start from">${cities}</ol></div></section>`;
+    // One person a device (keys and mouse, or touch); each connected gamepad adds a player (the panel shows only then).
+    // Each pad shows a monster nobody else on this screen plays.
+    for (let i = 0, used = [profile.mon]; i < PADS.n; i++) {
+      const q = pads[i]!;
+      for (let t = 0; t < 4 && used.includes(q.mon); t++) q.mon = (q.mon + 1) % 4;
+      used.push(q.mon);
+    }
+    const padRows = pads.slice(0, PADS.n).map((q, i) => `<li class="${q.on ? "cs-in" : ""}" style="--seat:${SEAT_C[i + 1]}"><i>P${i + 2}</i><b>GAMEPAD ${i + 1}</b><button type="button" class="bui-key cs-padmon" data-padmon="${i}" aria-label="Gamepad ${i + 1} plays ${esc(monName(q.mon, profile.look))}: change">${esc(monName(q.mon, profile.look))} ▸</button><small>${q.on ? "READY · stick move · A jump · X punch · B grab" : "Press any button to join"}</small></li>`).join("");
+    const who = PADS.n ? `<section class="cs-pads" aria-label="Players on this screen"><p class="cs-sub">PLAYERS ON THIS SCREEN</p><p class="cs-explain">Same screen: you, plus one player for each gamepad. Nobody joined on a pad: ${profile.rivals ? "the computer plays that monster." : "it sits out."}</p><ol class="cs-who"><li class="cs-in" style="--seat:${SEAT_C[0]}"><i>P1</i><b>${esc(monOf())}</b><small>READY · Keys: WASD move · Space jump · mouse/tap smash</small></li>${padRows}</ol></section>` : "";
+    return `<section class="cs-screen cs-menu" aria-label="CitySmash">${head()}<div class="cs-mbody"><div class="cs-story"><h2>Climb it. Smash it. Eat the snacks.</h2><p>You are a giant cyber ape. Jump at a building's side and hang on: your inside arm grips, your outside arm smashes the windows by your climb. Three hits a window. Enough holes and the whole thing pancakes. Seven cities, day into night. Beat a rival monster and it is yours to play.</p><div class="cs-actions"><button type="button" class="bui-key bui-go cs-big" data-play>▶ SMASH ${esc(CITIES[start]!.name)}</button><button type="button" class="bui-key" data-practice>PRACTICE</button><button type="button" class="bui-key" data-go="garage">GARAGE</button><button type="button" class="bui-key cs-friends" data-go="online"><b>PLAY WITH FRIENDS</b><small>ONLINE · EACH ON THEIR OWN DEVICE</small></button></div><p class="cs-sizes"><button type="button" class="bui-key cs-riv" data-rivals aria-pressed="${!!profile.rivals}">CPU RIVALS: ${profile.rivals ? "ON" : "OFF"}</button></p><p class="cs-explain">Computer rivals: the monsters nobody picked join as AI.</p>${who}${note ? `<p class="cs-note">${esc(note)}</p>` : ""}</div><ol class="cs-cities" aria-label="Start from">${cities}</ol></div></section>`;
   }
   function garageCard() {
-    const lk = profile.look;
+    const lk = profile.look, mon = profile.mon;
+    if (mon === 0 ? tab === "rc" || tab === "rt" : tab !== "code" && tab !== "rc" && tab !== "rt") tab = mon ? "rc" : "fur";
+    // Your monster: the ape always; a rival once you have beaten it in a one-player run (a silhouette till then).
+    const mons = [0, 1, 2, 3].map((k) => {
+      const own = owns("mon", k), c = k ? RIVAL_C[k - 1]! : [FURS[lk.fur]!.c, TRIMS[lk.trim]!.c];
+      return `<li><button type="button" class="bui-key cs-opt cs-sw cs-monk${own ? "" : " cs-sil"}" data-mon="${k}" aria-pressed="${mon === k}"${own ? "" : ` data-locked aria-label="${RIVALS[k - 1]}, locked: beat it in a city to unlock"`} style="--c:${own ? c[0] : "#0b0a14"};--t:${own ? c[1] : "#4a4466"}"><i></i><span>${k ? RIVALS[k - 1] : "THE APE"}</span>${own ? "" : "<small>🔒 Beat it in a city to unlock</small>"}</button></li>`;
+    }).join("");
     let side = "";
-    if (tab === "code") side = `<div class="cs-code"><label for="cs-code">Your save code: copy it to move this ape to another device.</label><textarea id="cs-code" rows="4" readonly>${exportCode(profile)}</textarea><label for="cs-in">Paste a code to load it:</label><textarea id="cs-in" rows="3"></textarea><button type="button" class="bui-key" data-import>LOAD CODE</button></div>`;
-    else {
+    if (tab === "code") side = `<div class="cs-code"><label for="cs-code">Your save code: copy it to move your monsters to another device.</label><textarea id="cs-code" rows="4" readonly>${exportCode(profile)}</textarea><label for="cs-in">Paste a code to load it:</label><textarea id="cs-in" rows="3"></textarea><button type="button" class="bui-key" data-import>LOAD CODE</button></div>`;
+    else if (tab === "rc" || tab === "rt") {
+      // A rival's colour (its own, or a fur you own) and its trim (its own, or a neon you own).
+      const j = tab === "rt" ? 1 : 0, P = j ? TRIMS : FURS, cur = profile.rlook[(mon - 1) * 2 + j]!, k = j ? "trim" : "fur";
+      side = `<ul class="cs-opts cs-${k}">${[-1, ...P.map((_, i) => i)].map((i) => {
+        const own = i < 0 || owns(k, i), sw = i < 0 ? RIVAL_C[mon - 1]![j]! : P[i]!.c, name = i < 0 ? "ITS OWN" : P[i]!.name.toUpperCase(), by = unlockedBy(`${k}:${i}`);
+        return `<li><button type="button" class="bui-key cs-opt cs-sw" data-rpart="${j}" data-i="${i}" aria-pressed="${cur === i}"${own ? "" : ` data-locked aria-label="${esc(name)}: flatten ${esc(CITIES[by]?.name ?? "")} to unlock"`} style="--c:${sw}"><i></i><span>${esc(name)}</span>${own ? "" : `<small>🔒 ${esc(CITIES[by]?.name ?? "")}</small>`}</button></li>`;
+      }).join("")}</ul>`;
+    } else {
       const [k, , n] = TABS.find((t) => t[0] === tab)!;
       const list = (k: Part, n: number) => `<ul class="cs-opts cs-${k}">${Array.from({ length: n }, (_, i) => {
-        const own = owns(k, i), on = k === "gear" ? (lk.gear & (1 << i)) > 0 : lk[k] === i, by = unlockedBy(`${k}:${i}`);
+        const own = owns(k, i), on = k === "gear" ? (lk.gear & (1 << i)) > 0 : lk[k as "fur"] === i, by = unlockedBy(`${k}:${i}`);
         const sw = k === "fur" ? FURS[i]!.c : k === "trim" || k === "hairc" ? TRIMS[i]!.c : "";
         const name = k === "fur" ? FURS[i]!.name : k === "trim" || k === "hairc" ? TRIMS[i]!.name : k === "pattern" ? PATTERNS[i]!.name : k === "face" ? FACES[i]!.name : k === "hair" ? HAIRS[i]!.name : GEAR[i]!.name;
         return `<li><button type="button" class="bui-key cs-opt${sw ? " cs-sw" : ""}" data-part="${k}" data-i="${i}" aria-pressed="${on}"${own ? "" : ` data-locked aria-label="${esc(name)}: flatten ${esc(CITIES[by]?.name ?? "")} to unlock"`}${sw ? ` style="--c:${sw}"` : ""}>${sw ? `<i></i><span>${esc(name.toUpperCase())}</span>` : esc(name.toUpperCase())}${own ? "" : `<small>🔒 ${esc(CITIES[by]?.name ?? "")}</small>`}</button></li>`;
@@ -153,7 +181,8 @@ export function createCitySmash(o: CitySmashOptions = {}) {
       // The hair tab: the style, then one colour for it (the neon palette).
       side = list(k, n) + (k === "hair" ? `<p class="cs-sub">HAIR COLOUR</p>${list("hairc", TRIMS.length)}` : "");
     }
-    return `<section class="cs-screen cs-garage" aria-label="Garage">${head()}<div class="cs-gbody"><div class="cs-gview"><div class="cs-pvwrap"></div><b class="cs-mname">${esc(heroName(lk.fur, lk.face))}</b></div><div class="cs-gside"><p class="cs-gtabs" role="group" aria-label="Garage tabs">${TABS.map(([k, label]) => `<button type="button" class="bui-key" data-tab="${k}" aria-pressed="${tab === k}">${label}</button>`).join("")}<button type="button" class="bui-key" data-tab="code" aria-pressed="${tab === "code"}">SAVE CODE</button></p>${side}${note ? `<p class="cs-note">${esc(note)}</p>` : ""}<p class="cs-actions"><button type="button" class="bui-key" data-go="menu">◂ BACK</button><button type="button" class="bui-key" data-random>RANDOM</button><button type="button" class="bui-key bui-go" data-play>▶ SMASH</button></p></div></div></section>`;
+    const tabs: [Tab, string][] = mon ? [["rc", "COLOUR"], ["rt", "TRIM"]] : TABS.map(([k, l]) => [k, l]);
+    return `<section class="cs-screen cs-garage" aria-label="Garage">${head()}<div class="cs-gbody"><div class="cs-gview"><div class="cs-pvwrap"></div><b class="cs-mname">${esc(monOf())}</b></div><div class="cs-gside"><p class="cs-sub">YOUR MONSTER · BEAT THEM TO PLAY THEM</p><ul class="cs-opts cs-mons" aria-label="Your monster">${mons}</ul><p class="cs-gtabs" role="group" aria-label="Garage tabs">${tabs.map(([k, label]) => `<button type="button" class="bui-key" data-tab="${k}" aria-pressed="${tab === k}">${label}</button>`).join("")}<button type="button" class="bui-key" data-tab="code" aria-pressed="${tab === "code"}">SAVE CODE</button></p>${side}${note ? `<p class="cs-note">${esc(note)}</p>` : ""}<p class="cs-actions"><button type="button" class="bui-key" data-go="menu">◂ BACK</button>${mon ? "" : `<button type="button" class="bui-key" data-random>RANDOM</button>`}<button type="button" class="bui-key bui-go" data-play>▶ SMASH</button></p></div></div></section>`;
   }
   function onlineCard() {
     return `<section class="cs-screen cs-online" aria-label="Online" data-step="pick">${head()}<div class="cs-obody"><h2>Play together online.</h2><p class="cs-sub">UP TO FOUR SCREENS · ONE RUN · THE HOST IS THE APE, THE OTHERS TAKE THE RIVALS</p>`
@@ -189,10 +218,25 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     screen = "play";
     note = "";
     paint();
-    const drivers = [0, AI, AI, AI];
-    for (let s = 1; s < n && s < NM; s++) drivers[s] = s;
+    // The cast: slot 0 is yours (the monster you play); a joined gamepad i drives slot i + 1, in the monster it picked;
+    // the rest in roster order (the ape first among them when you play a rival). `n` (the tests) seats players 2…n.
+    const drivers = [0, AI, AI, AI], taken = [profile.mon, -1, -1, -1];
+    for (let s = 1; s < NM; s++) if (!o.attract && !practice && (pads[s - 1]!.on || s < n)) (drivers[s] = s), !taken.includes(pads[s - 1]!.mon) && (taken[s] = pads[s - 1]!.mon);
+    const kinds = taken.slice();
+    for (let s = 1; s < NM; s++) if (kinds[s]! < 0) kinds[s] = cast(profile.mon, kinds.filter((k) => k >= 0)).find((k) => !kinds.includes(k))!;
+    const mon = o.attract ? 0 : profile.mon;
     scene = mountScene(sceneEl, {
       look: profile.look, seed: (o.seed ?? 1) * 7919 + profile.stats.runs * 31 + 20261116, first: from, rivals: profile.rivals, drivers, theme: pageTheme, sound: o.sound, attract: o.attract, practice,
+      kinds: o.attract ? undefined : kinds, dress: mon ? rivalDress(mon, profile.rlook) : null,
+      beat: (k) => {
+        // Beaten in a one-player run: that rival is yours to play.
+        if (o.attract || !scene || scene.run.humans() > 1) return "";
+        const r = beat(profile, k);
+        if (!r.fresh) return "";
+        profile = r.profile;
+        keep();
+        return `${RIVALS[k - 1]} UNLOCKED! PLAY IT FROM THE GARAGE`;
+      },
       unlocks: (ci) => {
         const t = cityUnlocks[ci];
         return t && t.length ? `UNLOCKED: ${t.map(partName).join(" · ")}` : "";
@@ -391,11 +435,30 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     const d = b.dataset;
     if ("play" in d) return void playRun(start);
     if ("practice" in d) return void playRun(0, 1, true);
+    if (d.mon) {
+      const k = +d.mon;
+      if ("locked" in d) return (note = `${RIVALS[k - 1]} is locked: beat it in a city (playing alone) to unlock it.`), paint();
+      profile = setMon(profile, k);
+      (note = ""), keep(), paint(), spin();
+      return void (cards.querySelector(`[data-mon="${k}"]`) as HTMLElement | null)?.focus();
+    }
+    if (d.rpart) {
+      const j = +d.rpart, i = +d.i!;
+      if ("locked" in d) return (note = `Locked: flatten ${CITIES[unlockedBy(`${j ? "trim" : "fur"}:${i}`)]?.name ?? "a city"} to unlock it.`), paint();
+      profile = setRival(profile, profile.mon, j, i);
+      (note = ""), keep(), paint(), spin();
+      return void (cards.querySelector(`[data-rpart="${j}"][data-i="${i}"]`) as HTMLElement | null)?.focus();
+    }
+    if (d.padmon) {
+      // A gamepad's monster: the next one nobody else on this screen plays (all four are open on one screen).
+      const q = pads[+d.padmon]!, used = [profile.mon, ...pads.filter((x) => x !== q && x.on).map((x) => x.mon)];
+      for (let t = 1; t <= 4; t++) if (!used.includes((q.mon + t) % 4)) return (q.mon = (q.mon + t) % 4), paint(), void (cards.querySelector(`[data-padmon="${d.padmon}"]`) as HTMLElement | null)?.focus();
+      return;
+    }
     if (d.go) return (note = ""), show(d.go as Screen);
     if (d.start) return (start = +d.start), paint();
-    if (d.players) return (players = +d.players), (note = players > 2 ? "Players three and four play on gamepads (a press joins)." : ""), paint();
     if ("rivals" in d) return (profile = { ...profile, rivals: profile.rivals ? 0 : 1 }), keep(), paint();
-    if (d.tab) return (tab = d.tab as Part | "code"), (note = ""), paint();
+    if (d.tab) return (tab = d.tab as Tab), (note = ""), paint();
     if (d.part) {
       const k = d.part as Part, i = +d.i!;
       if ("locked" in d) {
@@ -421,7 +484,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     if ("import" in d) {
       const p = importCode((cards.querySelector("#cs-in") as HTMLTextAreaElement).value);
       note = p ? "Profile loaded." : "That code does not read: check it was copied whole.";
-      if (p) (profile = p), (start = Math.max(...startable(profile))), keep();
+      if (p) (profile = p), (start = Math.max(...startable(profile))), keep(), (pvKey = "");
       return paint();
     }
     if (d.size) return void ((net.room = (Math.random() * ROOM_N) | 0), enterRoom(true, +d.size));
@@ -470,8 +533,12 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     get net() {
       return net.link;
     },
-    getSnapshot: () => ({ screen, start, players, best: profile.best, cleared: profile.cleared.slice(), look: { ...profile.look }, scene: scene ? scene.state : null, online: net.link ? { seat: net.seat, players: net.players, frame: net.link.frame, final: net.link.final, desync: net.link.desync } : null }),
+    getSnapshot: () => ({ screen, start, players, mon: profile.mon, owned: profile.owned.filter((t) => t.startsWith("mon:")), best: profile.best, cleared: profile.cleared.slice(), look: { ...profile.look }, scene: scene ? scene.state : null, online: net.link ? { seat: net.seat, players: net.players, frame: net.link.frame, final: net.link.final, desync: net.link.desync } : null }),
     play: (from = start, n = players) => playRun(from, n),
+    /** Play monster k (as the garage's pick: refused while locked). */
+    setMon: (k: number) => ((profile = setMon(profile, k)), keep(), screen !== "play" && paint(), profile.mon),
+    /** The gamepads on this screen (the menu's panel): joined, and each one's monster. */
+    pads,
     /** Practice: the controls without the danger. */
     practice: () => playRun(0, 1, true),
     show,
@@ -479,7 +546,7 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     setPart: (k: Part, i: number) => ((profile = setPart(profile, k, i)), keep(), screen === "garage" && paint(), profile.look),
     exportCode: () => exportCode(profile),
     /** The garage's turntable (tests turn it and check the rig's depth order): its diorama, its rig, a turn. */
-    garage: { dio: pdio, rig: () => pvMon, turn: (t: number) => ((turn = t), (spinTo = 0), preview()) },
+    garage: { dio: pdio, rig: () => tt.rig, turn: (t: number) => ((turn = t), (spinTo = 0), preview()) },
     destroy: () => engine.destroy(),
   };
 }

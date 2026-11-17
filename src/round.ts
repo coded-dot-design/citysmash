@@ -89,7 +89,7 @@ export function createRun(seed = 20261116) {
    *  same for a grab, [45] a whiff's recovery left (no punch or grab till it runs out), [46] the combo (./COMBO; 0 or 1: none), [47] the time since
    *  its last action ended (the combo's gap). */
   const MS = new Float64Array(NM * MW), MV: Float64Array[] = [];
-  for (let k = 0; k < NM; k++) MV.push(MS.subarray(k * MW, k * MW + MW));
+  for (let k = 0; k < NM; k++) MV.push(MS.subarray(k * MW, k * MW + MW)), (MV[k]![31] = k);
   let M = MV[0]!, cur = 0;
   const setCur = (k: number) => void ((cur = k), (M = MV[k]!));
   /** Soldiers: [alive, x, z, dir, state (0 walk, 1 aim), timer, want, step]. */
@@ -211,9 +211,9 @@ export function createRun(seed = 20261116) {
     S[21] = first;
     S[22] = practice ? 0 : rivals;
     S[28] = practice;
-    const drivers = [MV[0]![28]!, MV[1]![28]!, MV[2]![28]!, MV[3]![28]!];
+    const drivers = [MV[0]![28]!, MV[1]![28]!, MV[2]![28]!, MV[3]![28]!], kinds = [MV[0]![31]!, MV[1]![31]!, MV[2]![31]!, MV[3]![31]!];
     MS.fill(0);
-    for (let k = 0; k < NM; k++) (MV[k]![28] = k === HERO ? (drivers[k] === AI ? 0 : drivers[k]!) : drivers[k] || AI), (MV[k]![7] = MAX_HP), (MV[k]![24] = IN), (MV[k]![31] = k);
+    for (let k = 0; k < NM; k++) (MV[k]![28] = k === HERO ? (drivers[k] === AI ? 0 : drivers[k]!) : drivers[k] || AI), (MV[k]![7] = MAX_HP), (MV[k]![24] = IN), (MV[k]![31] = kinds[k]!);
     loadCity(first);
     S[0] = READY;
     run.n = 0;
@@ -230,11 +230,11 @@ export function createRun(seed = 20261116) {
     let ai = 0;
     const want = S[22] ? Math.min(3, 1 + Math.floor(ci / 2)) : 0;
     for (let k = 0; k < NM; k++) {
-      const O = MV[k]!, human = O[28] !== AI, hp = O[24] === IN && !O[29] ? O[7]! : 0;
+      const O = MV[k]!, human = O[28] !== AI, hp = O[24] === IN && !O[29] ? O[7]! : 0, kd = O[31]!;
       O.fill(0, 0, 24);
       O.fill(0, 29, 36);
       O.fill(0, 38, MW);
-      O[31] = k;
+      O[31] = kd;
       O[2] = ZS;
       O[12] = -1;
       if (human) {
@@ -1068,7 +1068,7 @@ export function createRun(seed = 20261116) {
     I[0] = I[1] = I[2] = I[3] = I[4] = I[5] = 0;
     if (S[0] === DONE || M[5] === KO || M[24] !== IN) return setCur(0);
     if (S[0] === READY || S[0] === CLEAR) return void ((I[0] = S[0] === READY ? 0.6 : 0), setCur(0));
-    const x = M[0]!, md = M[5]!, rival = M[31] !== HERO;
+    const x = M[0]!, md = M[5]!, rival = k !== HERO;
     A[5] = Math.max(0, A[5]! - 1 / 60);
     // A rival bonks whoever is in reach, now and then.
     if (rival && A[5]! <= 0 && M[8]! <= 0) {

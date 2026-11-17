@@ -2,11 +2,13 @@
 // or blocked storage just means no save), versioned and migrated step by step, repaired when partial
 // (`normalize`), never written over by an older game when a newer one saved it; an export code
 // (CS1-…, with a checksum) moves it to another device. Clearing a city unlocks garage parts (UNLOCKS)
-// and lets a run start from the next city.
-import { FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, LOOK0, type Look } from "./monster.ts";
+// and lets a run start from the next city. Beating a rival in a one-player run unlocks it to play
+// ("mon:1"…: SHARDCLAW, GLOOPMAW, VOLTWING); the ape is always yours. A rival you play keeps its own
+// colour and trim (`rlook`).
+import { FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, LOOK0, RIVALS, type Look } from "./monster.ts";
 import { CITIES, NCITY } from "./cities.ts";
 
-export const VERSION = 2;
+export const VERSION = 3;
 export interface Profile {
   v: number;
   look: Look;
@@ -17,6 +19,10 @@ export interface Profile {
   best: number;
   /** AI rivals on (1) or off (0). */
   rivals: number;
+  /** The monster you play: 0 the ape, 1 SHARDCLAW, 2 GLOOPMAW, 3 VOLTWING (owned as "mon:k"). */
+  mon: number;
+  /** Each rival's dress when you play it, [colour, trim] × 3: −1 its own, else a FURS / TRIMS index you own. */
+  rlook: number[];
   stats: { runs: number; buildings: number; snacks: number; helis: number };
 }
 export interface Store { get(k: string): string | null; set(k: string, v: string): void }
@@ -26,7 +32,7 @@ export const local: Store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* no storage: play on, unsaved */ } },
 };
 /** What you own from the start. */
-export const BASE = ["fur:0", "fur:1", "fur:2", "trim:0", "trim:1", "trim:2", "pattern:0", "pattern:1", "face:0", "face:1", "gear:0", "gear:1", ...HAIRS.map((_, i) => "hair:" + i), ...TRIMS.map((_, i) => "hairc:" + i)];
+export const BASE = ["mon:0", "fur:0", "fur:1", "fur:2", "trim:0", "trim:1", "trim:2", "pattern:0", "pattern:1", "face:0", "face:1", "gear:0", "gear:1", ...HAIRS.map((_, i) => "hair:" + i), ...TRIMS.map((_, i) => "hairc:" + i)];
 /** What each city unlocks the first time it is flat. */
 export const UNLOCKS: string[][] = [
   ["fur:3", "trim:3", "gear:2"],
@@ -37,20 +43,25 @@ export const UNLOCKS: string[][] = [
   ["fur:8", "fur:9", "pattern:4", "trim:6", "gear:6"],
   ["fur:10", "fur:11", "face:4", "trim:7", "gear:7"],
 ];
-const KINDS = { fur: FURS.length, trim: TRIMS.length, pattern: PATTERNS.length, face: FACES.length, gear: GEAR.length, hair: HAIRS.length, hairc: TRIMS.length } as const;
+const KINDS = { mon: 4, fur: FURS.length, trim: TRIMS.length, pattern: PATTERNS.length, face: FACES.length, gear: GEAR.length, hair: HAIRS.length, hairc: TRIMS.length } as const;
 export type Part = keyof typeof KINDS;
 /** A part's name for the garage and the city card. */
 export function partName(tag: string) {
   const [k, i] = tag.split(":") as [Part, string], n = +i;
-  return k === "fur" ? `${FURS[n]!.name.toUpperCase()} FUR` : k === "trim" ? `${TRIMS[n]!.name.toUpperCase()} TRIM` : k === "hair" ? `${HAIRS[n]!.name} HAIR` : k === "hairc" ? `${TRIMS[n]!.name.toUpperCase()} HAIR` : k === "pattern" ? `${PATTERNS[n]!.name} PATTERN` : k === "face" ? `${FACES[n]!.name} FACE` : GEAR[n]!.name;
+  return k === "mon" ? (n ? RIVALS[n - 1]! : "THE APE") : k === "fur" ? `${FURS[n]!.name.toUpperCase()} FUR` : k === "trim" ? `${TRIMS[n]!.name.toUpperCase()} TRIM` : k === "hair" ? `${HAIRS[n]!.name} HAIR` : k === "hairc" ? `${TRIMS[n]!.name.toUpperCase()} HAIR` : k === "pattern" ? `${PATTERNS[n]!.name} PATTERN` : k === "face" ? `${FACES[n]!.name} FACE` : GEAR[n]!.name;
 }
 /** The city that unlocks a part (−1: owned from the start). */
 export const unlockedBy = (tag: string) => UNLOCKS.findIndex((u) => u.includes(tag));
 
-export const fresh = (): Profile => ({ v: VERSION, look: { ...LOOK0 }, owned: BASE.slice(), cleared: [], best: 0, rivals: 1, stats: { runs: 0, buildings: 0, snacks: 0, helis: 0 } });
+export const fresh = (): Profile => ({ v: VERSION, look: { ...LOOK0 }, owned: BASE.slice(), cleared: [], best: 0, rivals: 1, mon: 0, rlook: RLOOK0.slice(), stats: { runs: 0, buildings: 0, snacks: 0, helis: 0 } });
 
-/** Version steps, in order: each takes the save from v to v + 1. 1 → 2: the hair (none yet, a pink to pick). */
-const STEPS: Record<number, (p: any) => any> = { 1: (p) => ({ ...p, v: 2, look: { ...p.look, hair: 0, hairc: LOOK0.hairc } }) };
+export const RLOOK0 = [-1, -1, -1, -1, -1, -1];
+/** Version steps, in order: each takes the save from v to v + 1. 1 → 2: the hair (none yet, a pink to pick).
+ *  2 → 3: the playable rivals (only the ape owned: a rival is won by beating it). */
+const STEPS: Record<number, (p: any) => any> = {
+  1: (p) => ({ ...p, v: 2, look: { ...p.look, hair: 0, hairc: LOOK0.hairc } }),
+  2: (p) => ({ ...p, v: 3, mon: 0, rlook: RLOOK0.slice(), owned: (Array.isArray(p.owned) ? p.owned : []).filter((t: unknown) => !/^mon:/.test(String(t))) }),
+};
 export function migrate(p: any): any {
   let q = { ...p, v: typeof p.v === "number" ? p.v : 1 };
   while (q.v < VERSION && STEPS[q.v]) q = STEPS[q.v]!(q);
@@ -58,7 +69,7 @@ export function migrate(p: any): any {
 }
 const okTag = (s: unknown): s is string => {
   if (typeof s !== "string") return false;
-  const m = /^(fur|trim|pattern|face|gear|hair|hairc):(\d+)$/.exec(s);
+  const m = /^(mon|fur|trim|pattern|face|gear|hair|hairc):(\d+)$/.exec(s);
   return !!m && +m[2]! < KINDS[m[1] as Part];
 };
 const clampI = (n: unknown, max: number, d: number) => (Number.isInteger(n) && (n as number) >= 0 && (n as number) < max ? (n as number) : d);
@@ -78,6 +89,8 @@ export function normalize(p: any): Profile {
     cleared: Array.isArray(p.cleared) ? ids.filter((id) => p.cleared.includes(id)) : [],
     best: Math.min(99_999_999, num(p.best)),
     rivals: p.rivals === 0 ? 0 : 1,
+    mon: has("mon", clampI(p.mon, 4, 0)) ? clampI(p.mon, 4, 0) : 0,
+    rlook: RLOOK0.map((d, j) => { const v = Array.isArray(p.rlook) ? p.rlook[j] : d, c: Part = j & 1 ? "trim" : "fur", n = j & 1 ? TRIMS.length : FURS.length; return Number.isInteger(v) && v >= 0 && v < n && has(c, v) ? v : -1; }),
     stats: { runs: num(p.stats?.runs), buildings: num(p.stats?.buildings), snacks: num(p.stats?.snacks), helis: num(p.stats?.helis) },
   };
   void f;
@@ -140,8 +153,33 @@ export function endRun(p: Profile, score: number, s: { buildings: number; snacks
 /** Set a look part you own (refused when locked); gear toggles its bit. */
 export function setPart(p: Profile, k: Part, i: number): Profile {
   if (!p.owned.includes(`${k}:${i}`)) return p;
+  if (k === "mon") return setMon(p, i);
   const look = { ...p.look };
   if (k === "gear") look.gear ^= 1 << i;
   else look[k] = i;
   return { ...p, look };
+}
+
+/** A rival beaten in a one-player run: it is yours to play. Returns the profile and whether it is new. */
+export function beat(p: Profile, kind: number): { profile: Profile; fresh: boolean } {
+  const t = "mon:" + kind;
+  if (kind < 1 || kind > 3 || p.owned.includes(t)) return { profile: p, fresh: false };
+  return { profile: { ...p, owned: [...p.owned, t] }, fresh: true };
+}
+/** Play monster k (refused when it is not yours). */
+export function setMon(p: Profile, k: number): Profile {
+  return p.owned.includes("mon:" + k) ? { ...p, mon: k } : p;
+}
+/** A rival's colour (j 0) or trim (j 1): −1 its own, else a fur / trim you own. */
+export function setRival(p: Profile, kind: number, j: number, i: number): Profile {
+  if (kind < 1 || kind > 3 || (i >= 0 && !p.owned.includes((j ? "trim:" : "fur:") + i))) return p;
+  const rlook = p.rlook.slice();
+  rlook[(kind - 1) * 2 + j] = i;
+  return { ...p, rlook };
+}
+/** The run's cast: slot 0 is yours (`mon`), the others in roster order (the ape first among the AI when you play a rival). */
+export function cast(mon: number, taken: number[] = []): number[] {
+  const out = [mon, ...taken.filter((k) => k !== mon)];
+  for (let k = 0; k < 4; k++) if (!out.includes(k)) out.push(k);
+  return out.slice(0, 4);
 }

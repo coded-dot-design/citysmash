@@ -5,12 +5,12 @@
   "name": "CitySmash",
   "kind": "CLIMB + SMASH",
   "tagline": "Climb it. Smash it. Eat the snacks.",
-  "description": "A giant cyber ape climbs and smashes his way across seven tabletop cities, day into night. Dress him in the garage, take on the rivals, play with friends on one screen or online.",
+  "description": "A giant cyber ape climbs and smashes his way across seven tabletop cities, day into night. Dress him in the garage, beat the rivals to play them, play with friends online.",
   "accent": "pink",
   "icon": "kaiju",
   "controls": [
     "A / D walk · W / S climb · K jump (a jump at a wall grabs it)",
     "Space / J punch (hold W or S: up or down) · L grab and eat",
-    "Player two: arrows · , punch · . jump · / grab · gamepads for three and four"
+    "Click or tap to smash and grab · the arrows walk too · each gamepad joins as a player (press any button on the start menu)"
   ]
 }

@@ -52,6 +52,10 @@ export const GEAR = [
 /** The rivals' names and what they are. */
 export const RIVALS = ["SHARDCLAW", "GLOOPMAW", "VOLTWING"];
 export const RIVAL_WHAT = ["a crystal crab-beast", "a tentacle blob", "a storm moth"];
+/** Each rival's own colour and trim. */
+export const RIVAL_C = [["#3d3378", "#7cf6ff"], ["#b23a9e", "#b6ff3a"], ["#4a5f8c", "#fff36b"]];
+/** The dress of rival `kind` from a profile's `rlook` ([colour, trim] × 3, −1: its own, undefined here). */
+export const rivalDress = (kind: number, rl: number[]) => { const c = rl[(kind - 1) * 2]!, t = rl[(kind - 1) * 2 + 1]!; return [c >= 0 ? FURS[c]!.c : undefined, t >= 0 ? TRIMS[t]!.c : undefined]; };
 /** The hero's name: its fur and its face. */
 export const heroName = (fur: number, face: number) => (FURS[fur] ?? FURS[0]!).word + " " + (FACES[face] ?? FACES[0]!).word;
 /** A monster's name. */
@@ -89,8 +93,8 @@ export const WALL: Wall[] = [
 type Shape = "box" | "wedge" | "cyl" | "prism";
 interface PartOpts { rot?: number[]; sides?: number; top?: number; emissive?: boolean; mask?: number }
 
-/** A monster on `d`: `kind` HERO (dressed by `look`), CRAB or BLOB; `id` keeps its part names apart. */
-export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id: string) {
+/** A monster on `d`: `kind` HERO (dressed by `look`), CRAB, BLOB or MOTH (`dress`: its [colour, trim] when you play it, else its own); `id` keeps its part names apart. */
+export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id: string, dress?: (string | undefined)[] | null) {
   const root = d.add({ id, shape: "group", size: [1.6, 0, 1.2], pos: [0, 0, 0], pick: false, tag: id, shadow: 0, cluster: id + "-B" });
   const n = (s: string) => id + "-" + s;
   // Every part is drawn at MK times the numbers below (the monster is about four floors tall).
@@ -213,9 +217,9 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     } else if (hair === 3) for (let k = 0; k < 3; k++) P("neck", "wedge", [0.62 - k * 0.1, 0.3 - k * 0.05, 0.6 - k * 0.16], [-0.12 - k * 0.1, 0.72 + k * 0.08, 0], hc, { ...H, rot: [0, 0, -0.25] }); // a swept crest
   } else if (kind === CRAB) {
     // ---- SHARDCLAW, the crystal crab-beast ----
-    main = "#3d3378";
-    acc = "#7cf6ff";
-    const dark = "#262054", claw = "#6a58c8";
+    main = dress?.[0] ?? "#3d3378";
+    acc = dress?.[1] ?? "#7cf6ff";
+    const dark = dress?.[0] ? shade(main, 0.62) : "#262054", claw = dress?.[0] ? shade(main, 1.35) : "#6a58c8";
     hipY = 1.1;
     height = 2.6;
     grp("body", "", [0, hipY, 0]);
@@ -252,9 +256,9 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     for (let t = 0; t < 4; t++) P("jaw", "box", [0.08, 0.1, 0.08], [0.2, 0, -0.27 + t * 0.18], K.teeth);
   } else if (kind === MOTH) {
     // ---- VOLTWING, the storm moth ----
-    main = "#4a5f8c";
-    acc = "#fff36b";
-    const dark = "#2b3a5c", fluff = "#d9e2f2", wing = "#6d86c4";
+    main = dress?.[0] ?? "#4a5f8c";
+    acc = dress?.[1] ?? "#fff36b";
+    const dark = dress?.[0] ? shade(main, 0.6) : "#2b3a5c", fluff = "#d9e2f2", wing = dress?.[0] ? shade(main, 1.3) : "#6d86c4";
     hipY = 1.05;
     height = 3.2;
     grp("body", "", [0, hipY, 0]);
@@ -292,9 +296,9 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     for (let t = 0; t < 3; t++) P("jaw", "box", [0.07, 0.09, 0.07], [0.18, 0.02, -0.12 + t * 0.12], K.teeth);
   } else {
     // ---- GLOOPMAW, the tentacle blob ----
-    main = "#b23a9e";
-    acc = "#b6ff3a";
-    const dark = "#7a2470";
+    main = dress?.[0] ?? "#b23a9e";
+    acc = dress?.[1] ?? "#b6ff3a";
+    const dark = dress?.[0] ? shade(main, 0.68) : "#7a2470";
     hipY = 0.35;
     height = 2.9;
     grp("body", "", [0, hipY, 0]);

@@ -57,6 +57,35 @@ try {
       assert.equal(m.sideways, false, `${at}: no sideways scroll`);
       assert.deepEqual(m.reach, [[7, 0, 0, 1], [0, 7, 8, 1]], `${at}: the reach diagram: 7 punch windows; grab: 15 on a wall (8 with helicopters)`);
       assert.ok(m.reachKey === 6 && m.reachSeen, `${at}: the diagram's key and size`);
+      // The monsters: four turntables, none started before they scroll into view; in view they draw and spin;
+      // a drag turns one; scrolled away they pause.
+      assert.ok(await p.evaluate(() => window.mons.length === 4 && window.mons.every((c) => !c.tt && !c.seen)), `${at}: the turntables wait off-screen`);
+      await p.evaluate(() => document.getElementById("monsters").scrollIntoView({ block: "start" }));
+      await until(p, () => window.mons.filter((c) => c.cv.dataset.drawn).length >= (innerWidth < 600 ? 1 : 4), null, `${at}: the monsters in view draw`);
+      await p.evaluate(() => document.querySelector(".mons").scrollIntoView({ block: "start" }));
+      const mm = await p.evaluate(async () => {
+        const c = window.mons[0], cv = c.cv, b = cv.getBoundingClientRect(), t0 = c.turn;
+        await new Promise((r) => setTimeout(r, 400));
+        const spun = c.turn !== t0;
+        const px = cv.getContext("2d").getImageData(cv.width >> 1, (cv.height * 0.45) | 0, 1, 1).data;
+        return { spun, px: [...px], w: b.width, label: cv.getAttribute("aria-label"), ta: getComputedStyle(cv).touchAction, labels: window.mons.map((m) => m.cv.getAttribute("aria-label")) };
+      });
+      assert.ok(mm.spun, `${at}: the turntable spins slowly`);
+      assert.ok(mm.w > 150 && mm.ta === "pan-y", `${at}: a turntable ${mm.w} px wide, touch-action pan-y`);
+      assert.deepEqual(mm.labels, ["THE APE, a giant cyber ape: drag to turn", "SHARDCLAW, a crystal crab-beast: drag to turn", "GLOOPMAW, a tentacle blob: drag to turn", "VOLTWING, a storm moth: drag to turn"], `${at}: each has its label`);
+      const box = await p.evaluate(() => { const b = window.mons[0].cv.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; });
+      const before = await p.evaluate(() => window.mons[0].turn);
+      await p.mouse.move(box[0], box[1]);
+      await p.mouse.down();
+      await p.mouse.move(box[0] + 80, box[1], { steps: 4 });
+      const during = await p.evaluate(() => window.mons[0].turn);
+      await p.mouse.up();
+      assert.ok(during - before > 0.6, `${at}: a drag turns it (${(during - before).toFixed(2)})`);
+      if (SHOTS) await p.evaluate(() => document.getElementById("monsters").scrollIntoView({ block: "start" })), await p.waitForTimeout(300), await p.screenshot({ path: `${SHOTS}/monsters-${w}-${theme}.png`, fullPage: false });
+      await p.evaluate(() => scrollTo(0, 0));
+      await until(p, () => window.mons.every((c) => !c.seen), null, `${at}: scrolled away, they pause`);
+      const tp = await p.evaluate(async () => { const t = window.mons.map((c) => c.turn); await new Promise((r) => setTimeout(r, 300)); return window.mons.every((c, i) => c.turn === t[i]); });
+      assert.ok(tp, `${at}: paused off-screen`);
       if (SHOTS) {
         await p.screenshot({ path: `${SHOTS}/landing-${w}-${theme}.png` });
         if (!touch) await p.screenshot({ path: `${SHOTS}/landing-${w}-${theme}-full.png`, fullPage: true });
@@ -72,8 +101,19 @@ try {
   await r.goto(`${server.url}${BASE}/`);
   await until(r, () => !document.querySelector(".dt-poster").hidden, null, "reduced motion: the poster");
   assert.equal(await r.evaluate(() => !!window.hero), false, "reduced motion: no game");
+  await r.evaluate(() => document.getElementById("monsters").scrollIntoView({ block: "start" }));
+  await until(r, () => window.mons.every((c) => c.cv.dataset.drawn), null, "reduced motion: the monsters draw");
+  const still = await r.evaluate(async () => { const t = window.mons.map((c) => c.turn); await new Promise((q) => setTimeout(q, 500)); return window.mons.every((c, i) => c.turn === t[i]); });
+  assert.ok(still, "reduced motion: a still pose, no spin");
+  const rb = await r.evaluate(() => { const b = window.mons[1].cv.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; });
+  const r0 = await r.evaluate(() => window.mons[1].turn);
+  await r.mouse.move(rb[0], rb[1]);
+  await r.mouse.down();
+  await r.mouse.move(rb[0] - 60, rb[1], { steps: 3 });
+  await r.mouse.up();
+  assert.ok((await r.evaluate(() => window.mons[1].turn)) < r0 - 0.4, "reduced motion: a drag still turns it");
   await rm.close();
-  console.log("CitySmash site: green at 1440 and 390, dark and light; reduced motion shows the poster.");
+  console.log("CitySmash site: green at 1440 and 390, dark and light (the four monster turntables: lazy, spin, drag, pause off-screen); reduced motion shows the poster and still monsters that still drag.");
 } finally {
   await browser.close();
   await server.close();

@@ -507,6 +507,19 @@ test("players take the rivals from the AI (and give them back)", () => {
   assert.equal(run.MV[CRAB][28], AI, "back to the AI");
 });
 
+test("v10: a cast of any kinds: you play SHARDCLAW, the ape is the first AI rival; the kinds hold over a reset and a new city", () => {
+  const run = R.createRun(3);
+  [1, 0, 2, 3].forEach((k, s) => (run.MV[s][31] = k));
+  run.reset(3, 0, 1);
+  assert.deepEqual(run.MV.map((O) => O[31]), [1, 0, 2, 3], "kept over a reset");
+  assert.equal(run.MV[0][28], 0, "slot 0 is yours");
+  assert.equal(run.MV[1][24], R.WAIT, "the ape waits to come in as an AI rival");
+  run.loadCity(4);
+  assert.deepEqual(run.MV.map((O) => O[31]), [1, 0, 2, 3], "kept in a new city");
+  play(run, 600, (I, f) => (I[0] = f < 10 ? 1 : 0));
+  assert.equal(run.MV[1][24], IN, "the ape came in");
+});
+
 test("the run allocates nothing per step", async () => {
   const run = R.createRun(20261116), I = new Float64Array(24), A = new Float64Array(6);
   const go = (n) => {

@@ -112,3 +112,56 @@ test("the hair: a v1 save and a v1 code (before the hair) still load, with none;
   assert.equal(P.normalize({ ...p, look: { ...p.look, hair: 9, hairc: -1 } }).look.hair, 0, "out of range: none");
   assert.deepEqual(Mo.HAIRS.map((h) => h.id), ["none", "mohawk", "spikes", "crest"]);
 });
+
+test("v10: the playable rivals: only the ape at first; beating a rival unlocks it (once); a locked one can't be picked", () => {
+  let p = P.fresh();
+  assert.equal(p.mon, 0);
+  assert.ok(p.owned.includes("mon:0") && !p.owned.some((t) => /^mon:[123]$/.test(t)), "only the ape");
+  assert.equal(P.setMon(p, 1), p, "SHARDCLAW is locked");
+  const a = P.beat(p, 1);
+  assert.ok(a.fresh);
+  p = a.profile;
+  assert.equal(P.beat(p, 1).fresh, false, "only once");
+  assert.equal(P.beat(p, 0).fresh, false, "the ape is never won");
+  p = P.setMon(p, 1);
+  assert.equal(p.mon, 1);
+  assert.equal(P.partName("mon:1"), "SHARDCLAW");
+  // Its dress: its own colour, or a fur you own; a trim you own.
+  assert.equal(P.setRival(p, 1, 0, 5), p, "fur 5 is locked");
+  p = P.setRival(p, 1, 0, 1);
+  p = P.setRival(p, 1, 1, 2);
+  assert.deepEqual(p.rlook.slice(0, 2), [1, 2]);
+  assert.deepEqual(Mo.rivalDress(1, p.rlook), [Mo.FURS[1].c, Mo.TRIMS[2].c]);
+  assert.deepEqual(Mo.rivalDress(2, p.rlook), [undefined, undefined], "the others in their own colours");
+  // It survives the code and a reload.
+  assert.deepEqual(P.importCode(P.exportCode(p)), p);
+  const s = mem();
+  P.save(p, s);
+  assert.deepEqual(P.load(s).profile, p);
+  // A save that claims a rival it doesn't own plays the ape.
+  assert.equal(P.normalize({ ...p, owned: ["fur:0"], mon: 2 }).mon, 0);
+});
+
+test("v10: an old save (v2) and an old CS1 code migrate with only the ape playable", () => {
+  const old = { v: 2, look: { ...Mo.LOOK0, fur: 1 }, owned: [...P.BASE.filter((t) => !t.startsWith("mon:")), "fur:3", "mon:2"], cleared: ["port-lumen"], best: 77, rivals: 0, stats: { runs: 3, buildings: 4, snacks: 5, helis: 1 } };
+  const s = mem();
+  s.set(P.KEY, JSON.stringify(old));
+  const p = P.load(s).profile;
+  assert.equal(p.v, P.VERSION);
+  assert.equal(p.mon, 0);
+  assert.deepEqual(p.owned.filter((t) => t.startsWith("mon:")), ["mon:0"], "only the ape (a stray mon tag in an old save is dropped)");
+  assert.deepEqual([p.look.fur, p.cleared, p.best, p.rivals, p.owned.includes("fur:3")], [1, ["port-lumen"], 77, 0, true], "the rest kept");
+  assert.deepEqual(p.rlook, P.RLOOK0);
+  // An old code (CS1, a v2 body) loads the same way.
+  const b64 = Buffer.from(JSON.stringify(old)).toString("base64");
+  let h = 7;
+  for (let i = 0; i < b64.length; i++) h = (Math.imul(h, 31) + b64.charCodeAt(i)) >>> 0;
+  const q = P.importCode(`CS1-${b64}-${(h % 46656).toString(36).padStart(3, "0")}`);
+  assert.ok(q && q.mon === 0 && q.owned.filter((t) => t.startsWith("mon:")).length === 1 && q.best === 77);
+});
+
+test("v10: the cast: yours in slot 0, the ape first among the AI when you play a rival", () => {
+  assert.deepEqual(P.cast(0), [0, 1, 2, 3]);
+  assert.deepEqual(P.cast(1), [1, 0, 2, 3]);
+  assert.deepEqual(P.cast(3), [3, 0, 1, 2]);
+});

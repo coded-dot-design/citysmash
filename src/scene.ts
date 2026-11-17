@@ -25,7 +25,7 @@ import {
   type Run,
 } from "./round.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
-import { buildMonster, monName, shade, RIVALS, WALL, TRIMS, HELD, type Look, type Monster, type RigInk } from "./monster.ts";
+import { buildMonster, monName, shade, WALL, TRIMS, HELD, type Look, type Monster, type RigInk } from "./monster.ts";
 
 const TAU = 6.283185307179586;
 /** Practice's steps, in ./round.ts P_* order. */
@@ -92,8 +92,14 @@ export interface SceneOptions {
   first?: number;
   /** AI rivals come in (1) or not (0). */
   rivals?: number;
-  /** Who drives each monster at the start: a seat 0..3 or AI (the ape is always seat 0). */
+  /** Who drives each monster at the start: a seat 0..3 or AI (seat 0 drives monster 0). */
   drivers?: number[];
+  /** Which monster each slot is (0 the ape, 1 SHARDCLAW, 2 GLOOPMAW, 3 VOLTWING): slot 0 is this screen's player. */
+  kinds?: number[];
+  /** Slot 0's dress when it is a rival ([colour, trim]; undefined: its own). */
+  dress?: (string | undefined)[] | null;
+  /** An AI rival knocked out (its kind): the shell's word for it (an unlock), or "". */
+  beat?(kind: number): string;
   theme: () => "dark" | "light";
   sound?: boolean;
   /** The landing page's hero: the ape on the autopilot, no stickers, the cities loop. */
@@ -116,7 +122,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   const light = () => so.theme() === "light";
   const run: Run = createRun(so.seed ?? 20261116), S = run.S, MV = run.MV;
   const drivers = so.drivers ?? [0, AI, AI, AI];
-  for (let k = 0; k < NM; k++) run.MV[k]![28] = k === HERO ? 0 : drivers[k] ?? AI;
+  for (let k = 0; k < NM; k++) (run.MV[k]![28] = k === HERO ? 0 : drivers[k] ?? AI), (run.MV[k]![31] = so.kinds?.[k] ?? k);
   run.reset(so.seed ?? 20261116, so.first ?? 0, so.rivals ?? 1, so.practice ? 1 : 0);
   if (so.attract) S[27] = 1;
   let built = -1, P: Pal = palette(CITIES[S[16]!]!, light());
@@ -130,7 +136,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   const play = L.add(document.createElement("button"));
   play.type = "button";
   play.className = "cs-play";
-  play.setAttribute("aria-label", "CitySmash: A and D walk, W and S climb, K jumps (a jump at a wall grabs it), Space or J punches (W or S held: up or down), L grabs and eats. Player two: the arrow keys, comma punches, period jumps, slash grabs. Gamepads join as players three and four. M mutes, Escape for the menu");
+  play.setAttribute("aria-label", "CitySmash: A and D walk, W and S climb, K jumps (a jump at a wall grabs it), Space or J punches (W or S held: up or down), L grabs and eats; or tap and click what to smash. Each gamepad joins as a player of its own. M mutes, Escape for the menu");
   const hud = L.add(document.createElement("div"));
   hud.className = "cs-hud";
   hud.hidden = !!so.attract;
@@ -333,7 +339,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     // The monsters: the hero (dressed), the rivals.
     PI.ink = P.ink; PI.paper = P.paper; PI.skin = P.skin; PI.hole = P.hole; PI.slab = light() ? "#b9b2c4" : "#5d5874"; PI.rebar = light() ? "#7a4a3a" : "#c9a07a"; PI.glow = P.fire; PI.uniform = P.soldier; PI.helmet = P.helmet; PI.metal = P.metal; PI.tie = P.antenna; PI.shirts = P.people;
     INK.ink = P.ink; INK.eye = P.eye; INK.pupil = P.pupil; INK.teeth = P.teeth; INK.night = P.night; INK.metal = P.metal;
-    for (let k = 0; k < NM; k++) mons.push(buildMonster(dio, k, look, INK, "mon" + k));
+    for (let k = 0; k < NM; k++) mons.push(buildMonster(dio, MV[k]![31]!, look, INK, "mon" + k, k ? null : so.dress));
     // The helicopters.
     for (let h = 0; h < NH; h++) {
       const hid = "heli" + h;
@@ -468,6 +474,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   ro.observe(stage);
   engine.signal.addEventListener("abort", () => ro.disconnect(), { once: true });
   addEventListener("gamepadconnected", () => ((V[6] = 1), engine.wake()), sig);
+  try {
+    if (!so.attract && [...(navigator.getGamepads?.() ?? [])].some((p) => p && p.connected)) V[6] = 1;
+  } catch {}
 
   // One camera per stage shape: side-on, a little above the street; the city's whole height (its tallest
   // building and its crown, the street in front) always fits the stage under the
@@ -914,8 +923,9 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
         const O = MV[val | 0]!;
         W.smoke.ring(rnd, O[0]!, O[1]! + 1.5, O[2]!, 14, 2.5, 1, 0.9, 0.5, 0.7);
         if (at(O[0]!, O[1]! + 2, O[2]!)) fx.word(tmp[0]!, tmp[1]! - 20, W_POOF, 4, 22);
-        toast(`${who(val)} SHRINKS!`, mine(val) ? "bad" : "go");
-        say(`${who(val)} is out`);
+        const won = !net && !so.attract && !S[28] && O[28] === AI && so.beat ? so.beat(O[31]!) : "";
+        toast(won || `${who(val)} SHRINKS!`, mine(val) ? "bad" : "go");
+        say(`${who(val)} is out${won ? ". " + won : ""}`);
       } else if (type === E_JOIN) engine.events.emit("join");
       else if (type === E_CITY) {
         engine.events.emit("city");
@@ -934,7 +944,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     }
     run.clear();
   }
-  const who = (k: number) => monName(k, look);
+  const who = (k: number) => monName(MV[k]![31]!, look);
   /** Monster k's mouth, in the world, into tmp2. */
   function mouth(k: number) {
     const O = MV[k]!;
@@ -989,7 +999,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     if (was[3] !== ph) {
       was[3] = ph;
       const touch = !!thePad.el.offsetParent;
-      hintEl.textContent = ph === READY ? (touch ? "↑ at a wall grabs it · ✊ punches the window next to you · ✋ eat a snack · sparks bite" : "A/D walk · K jump at a wall to grab it · W/S climb · Space punch (hold W/S: up, down) · L eat · sparks bite · P2: arrows , . /") : "";
+      hintEl.textContent = ph === READY ? (touch ? "↑ at a wall grabs it · ✊ punches the window next to you · ✋ eat a snack · sparks bite" : "A/D walk · K jump at a wall to grab it · W/S climb · Space punch (hold W/S: up, down) · L eat · sparks bite") : "";
     }
     // The card between cities.
     if (ph === CLEAR && cardUp !== ci) {
@@ -1045,7 +1055,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     if (s <= 0 || s >= NM) return;
     run.join(s, on ? s : AI);
     seatsIn = on ? seatsIn | (1 << s) : seatsIn & ~(1 << s);
-    if (on) toast(`P${s + 1} IS ${RIVALS[s - 1]}!`, "go"), say(`Player ${s + 1} takes ${RIVALS[s - 1]}`);
+    if (on) toast(`P${s + 1} IS ${who(s)}!`, "go"), say(`Player ${s + 1} takes ${who(s)}`);
     hudDirty = true;
     so.on("join", s);
     engine.busy(1);
@@ -1744,10 +1754,8 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     }
   }
 
-  // ---- input: four seats (the keyboard's halves, gamepads, the pad for seat one) ----
+  // ---- input: seat one (the keyboard and mouse, or touch: one person a device), seats two to four (gamepads) ----
   const GP = new Float64Array(SEATS * 6), GB = new Uint8Array(SEATS * 3);
-  // Seat two's keys: [left, right, up, down] held, and the presses (punch, jump, grab).
-  const K2 = new Float64Array(4), K2P = new Uint8Array(3);
   /** Read every seat on this screen into IN (NI numbers a seat); seat one's tap or click rides as a target. */
   function readSeats(out: Float64Array) {
     out.fill(0);
@@ -1765,12 +1773,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       if (tapK) (I1[5] = tapT), (I1[tapK === 1 ? 2 : 4] = 1), (tapK = 0);
     }
     for (let j = 0; j < NI; j++) out[j] = I1[j]!;
-    out[NI] = GP[6]! || K2[1]! - K2[0]!;
-    out[NI + 1] = -GP[7]! || K2[2]! - K2[3]!;
-    out[NI + 2] = K2P[0] || GP[8]! ? 1 : 0;
-    out[NI + 3] = K2P[1] || GP[9]! ? 1 : 0;
-    out[NI + 4] = K2P[2] || GP[10]! ? 1 : 0;
-    for (let s = 2; s < SEATS; s++) {
+    for (let s = 1; s < SEATS; s++) {
       const o = s * 6;
       out[s * NI] = GP[o]!;
       out[s * NI + 1] = -GP[o + 1]!;
@@ -1778,14 +1781,14 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       out[s * NI + 3] = GP[o + 3]!;
       out[s * NI + 4] = GP[o + 4]!;
     }
-    K2P.fill(0);
     for (let s = 0; s < SEATS; s++) GP[s * 6 + 2] = GP[s * 6 + 3] = GP[s * 6 + 4] = 0;
   }
   function gamepadRead() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : null;
     for (let s = 0; s < SEATS; s++) GP[s * 6] = GP[s * 6 + 1] = 0;
     if (!pads) return;
-    let n = 0;
+    // Each connected gamepad is a player of its own: the first is seat two, then three and four.
+    let n = 1;
     for (let i = 0; i < pads.length && n < SEATS; i++) {
       const p = pads[i];
       if (!p || !p.connected) continue;
@@ -1794,15 +1797,13 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       GP[o] = dz(ax[0] ?? 0) || v(15) - v(14);
       GP[o + 1] = dz(ax[1] ?? 0) || v(13) - v(12);
       const now0 = v(2) || v(7), now1 = v(0), now2 = v(1) || v(3), g = n * 3;
-      if (n === 0) GP[5] = now0;
       if (now0 && !GB[g]) GP[o + 2] = 1;
       if (now1 && !GB[g + 1]) GP[o + 3] = 1;
       if (now2 && !GB[g + 2]) GP[o + 4] = 1;
       GB[g] = now0; GB[g + 1] = now1; GB[g + 2] = now2;
       const any = GP[o] || GP[o + 1] || now0 || now1 || now2;
-      if (any && n === 0) (auto = false), engine.wake();
-      // A pad's first press brings its seat in (seats two to four take the rivals).
-      if (any && n > 0 && !net && !(seatsIn & (1 << n)) && endC.hidden) join(n, true);
+      // A pad's first press brings its seat in.
+      if (any && !net && !(seatsIn & (1 << n)) && endC.hidden) join(n, true);
       n++;
     }
   }
@@ -1865,23 +1866,13 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     },
   });
 
-  // Keys on the stage: seat one (WASD, Space/J, K, L; the arrows too while seat two is out), seat two
-  // (the arrows, comma, period, slash: its first press brings it in), M mutes, Escape is the menu.
+  // Keys on the stage: seat one (WASD or the arrows, Space/J, K, L), M mutes, Escape is the menu.
   const MAP: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "up", KeyS: "down", Space: "jump", KeyJ: "punch", KeyK: "jump", KeyL: "grab" };
   const ARROWS: Record<string, string> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
-  const P2KEYS: Record<string, number> = { ArrowLeft: 0, ArrowRight: 1, ArrowUp: 2, ArrowDown: 3 }, P2ACT: Record<string, number> = { Comma: 0, Period: 1, Slash: 2 };
   stage.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.code === "KeyM") return void (e.preventDefault(), toggle());
     if (e.code === "Escape") return void (e.preventDefault(), so.on("menu", 0));
-    const p2 = !!(seatsIn & 2);
-    if (P2ACT[e.code] !== undefined && !net) {
-      e.preventDefault();
-      if (!p2 && endC.hidden) join(1, true);
-      if (!e.repeat) K2P[P2ACT[e.code]!] = 1;
-      return void engine.wake();
-    }
-    if (p2 && !net && P2KEYS[e.code] !== undefined) return void (e.preventDefault(), (K2[P2KEYS[e.code]!] = 1), engine.wake());
     const k = MAP[e.code] ?? ARROWS[e.code];
     if (!k || (e.target as Element).closest?.(".bui-pad")) return;
     if ((e.target as Element).closest?.(".cs-card") && (e.code === "Space" || e.code === "Enter")) return;
@@ -1892,7 +1883,6 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     engine.wake();
   }, sig);
   stage.addEventListener("keyup", (e) => {
-    if (P2KEYS[e.code] !== undefined) K2[P2KEYS[e.code]!] = 0;
     const k = MAP[e.code] ?? ARROWS[e.code];
     if (k) c.press(k, false);
   }, sig);
@@ -1949,7 +1939,7 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
       const M = MV[net ? net.seat : 0]!;
       return {
         phase: S[0]!, city: S[16]!, cityId: CITIES[S[16]!]!.id, mode: M[5]!, hp: M[7]!, score: S[2]!, mine: M[25]!, flat: Math.round((S[8]! / Math.max(1, run.bk.L[2]!)) * 100), holes: S[3]!, snacks: S[6]!,
-        cleared: S[18]!, won: S[20]!, end: !endC.hidden, card: !ccard.hidden, x: M[0]!, y: M[1]!, seats: seatsIn, drawn: V[5] === 1, name: monName(0, look),
+        cleared: S[18]!, won: S[20]!, end: !endC.hidden, card: !ccard.hidden, x: M[0]!, y: M[1]!, seats: seatsIn, drawn: V[5] === 1, name: who(0),
       };
     },
     join,

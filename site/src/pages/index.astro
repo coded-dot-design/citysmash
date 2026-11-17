@@ -5,7 +5,7 @@ import Base from '../layouts/Base.astro';
 import { base, GZIP, FIZLET, REPO } from '../site';
 import { CITIES } from '../../../src/cities.ts';
 import { REACH, NR, GRAB_WALL, NGW, NG, GRAB_HELI, NGH, COMBO } from '../../../src/round.ts';
-const description = 'CitySmash: a giant cyber ape climbs and smashes his way across seven tabletop cities, day into night. Dress him in the garage, fight three rival giants, play with friends on one screen or online. Free in the browser, by Chris Cooley, built on Fizlet.';
+const description = 'CitySmash: a giant cyber ape climbs and smashes his way across seven tabletop cities, day into night. Dress him in the garage, beat three rival giants to play them, play with friends online. Free in the browser, by Chris Cooley, built on Fizlet.';
 const kb = (GZIP / 1024).toFixed(1);
 const steps = [
   ['JUMP AT A WALL', 'Walk the street and jump at a building’s side: the jump grabs it. He climbs the side wall, set back from the front, so every window in reach stays in view. Your inside arm grips; your outside arm reaches round the corner to smash.'],
@@ -14,12 +14,13 @@ const steps = [
   ['CITY AFTER CITY', 'Enough holes and a building shakes, then pancakes floor by floor. Flatten them all and the next city opens, later in the day and angrier: more soldiers, armour on the tanks, faster helicopters.'],
 ];
 const TOD = ['Day', 'Dusk', 'Night'];
+// [name, what, blurb, its kind in the game (src/round.ts HERO, CRAB, BLOB, MOTH): the turntable draws that rig].
 const mons = [
-  ['THE APE', 'Yours to dress', 'A giant cyber ape: fur, pattern, face, a cyber arm and more gear, a neon trim of your pick.', '#c4552e', '#22e6ff'],
-  ['SHARDCLAW', 'A crystal crab-beast', 'A low shell of glowing crystals, six legs and two big claws. It steals your snacks.', '#3d3378', '#7cf6ff'],
-  ['GLOOPMAW', 'A tentacle blob', 'A dome of goo on tentacles, one eye, a wide mouth. It punches you off walls.', '#b23a9e', '#b6ff3a'],
-  ['VOLTWING', 'A storm moth', 'Big crackling wings, feathered antennae, a bad attitude. Out from the fourth city on.', '#4a5f8c', '#fff36b'],
-];
+  ['THE APE', 'Yours to dress', 'A giant cyber ape: fur, pattern, face, a cyber arm and more gear, a neon trim of your pick.', 0, 'a giant cyber ape'],
+  ['SHARDCLAW', 'A crystal crab-beast', 'A low shell of glowing crystals, six legs and two big claws. It steals your snacks.', 1, 'a crystal crab-beast'],
+  ['GLOOPMAW', 'A tentacle blob', 'A dome of goo on tentacles, one eye, a wide mouth. It punches you off walls.', 2, 'a tentacle blob'],
+  ['VOLTWING', 'A storm moth', 'Big crackling wings, feathered antennae, a bad attitude. Out from the fifth city on.', 3, 'a storm moth'],
+] as const;
 // The reach diagram, from the game's own tables (src/round.ts REACH, GRAB_WALL, GRAB_HELI): six windows across
 // (two of open air and the ape's own column, then three of its building), five floors; the ape in the middle.
 const COLS = 6, ROWS = 5, APE_C = 2, APE_R = 2;
@@ -83,7 +84,7 @@ const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'pr
           <li><span class="rc heli" aria-hidden="true"></span> grab, and swat helicopters (next to him)</li>
         </ul>
       </div>
-      <p class="soon">Phone: the stick moves and climbs, JUMP jumps, tap what you want smashed or eaten. Computer: A/D walk, W/S climb, Space or K jumps, click to smash or grab, M mutes. No mouse or a gamepad: J punches (W or S held: up or down), a flick of the stick in or out steps the punch close, mid, far; L grabs the nearest snack.</p>
+      <p class="soon">Phone: the stick moves and climbs, JUMP jumps, tap what you want smashed or eaten. Computer: A/D walk, W/S climb, Space or K jumps, click to smash or grab, M mutes. No mouse or a gamepad: J punches (W or S held: up or down), a flick of the stick in or out steps the punch close, mid, far; L grabs the nearest snack. Each gamepad is a player of its own: press any button on the start menu to join.</p>
       <p class="soon"><a class="bui-key" href={base('play/?mode=practice')}>Try it in practice</a> Nothing hurts there: no army, no health lost, buildings come back. A card ticks off each move as you do it (walk, grab a wall, climb, all seven punches, a grab, a swat, a punch past a live window).</p>
     </div>
   </section>
@@ -124,11 +125,11 @@ const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'pr
   <section class="section" id="monsters">
     <div class="wrap">
       <p class="eyebrow"><span class="index">04</span> THE MONSTERS</p>
-      <h2>One ape. Three rivals.</h2>
+      <h2>One ape. Three rivals. Beat them to play them.</h2>
       <ul class="modes mons">
-        {mons.map(([n, w, b, a, c]) => <li class="panel"><span class="swatch" style={`--a:${a};--b:${c}`} aria-hidden="true"></span><p class="meta">{w}</p><h3>{n}</h3><p>{b}</p></li>)}
+        {mons.map(([n, w, b, k, what]) => <li class="panel"><canvas class="mon3d" data-kind={k} tabindex="0" role="img" aria-label={`${n}, ${what}: drag to turn`}></canvas><p class="meta">{w}</p><h3>{n}</h3><p>{b}</p></li>)}
       </ul>
-      <p class="soon">The army fights back: soldiers on the street, snipers in the windows, helicopters, tanks, a gunboat. Out of health, a monster shrinks to a tiny figure and runs off the table.</p>
+      <p class="soon">Play as the ape from the start. Beat a rival in a city, playing alone, and it is yours to play too, in a colour and trim of your pick. The army fights back: soldiers on the street, snipers in the windows, helicopters, tanks, a gunboat. Out of health, a monster shrinks to a tiny figure and runs off the table.</p>
     </div>
   </section>
 
@@ -136,8 +137,8 @@ const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'pr
     <div class="wrap split">
       <div>
         <p class="eyebrow"><span class="index">05</span> PLAY TOGETHER</p>
-        <h2>Up to four, one screen or online.</h2>
-        <p>On one screen: player one on WASD, player two on the arrows, three and four on gamepads. Online: the host opens a room and sends the link; up to three friends drop in on their own phones or computers. The host is the ape, the others take the rivals. A shared score, and one score each. You can still punch each other off the walls.</p>
+        <h2>Up to four, online. Gamepads for one screen.</h2>
+        <p>One person a device: play with friends online, each on their own phone or computer. On one screen, extra players come with gamepads: each connected pad gets a slot on the start menu, a press joins it. Online: the host opens a room and sends the link; up to three friends drop in on their own phones or computers. The host is the ape, the others take the rivals. A shared score, and one score each. You can still punch each other off the walls.</p>
         <p>Online play needs an invite code.</p>
       </div>
       <div class="panel lit">
@@ -168,9 +169,62 @@ const bricks = ['kernel', 'diorama', 'fx', 'input', 'pad', 'sound', 'touch', 'pr
 </Base>
 
 <script>
-  import { createCitySmash } from "../../../dist/citysmash.mjs";
+  import { createCitySmash, turntable, LOOK0 } from "../../../dist/citysmash.mjs";
   const host = document.getElementById("dt-hero")!;
   const poster = document.querySelector<HTMLElement>(".dt-poster")!;
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) poster.hidden = false;
   else (window as unknown as { hero: unknown }).hero = createCitySmash({ host, attract: true, sound: false });
+
+  // The monsters, each on the game's own turntable: started only when its card scrolls into view, paused
+  // off-screen; a slow spin (none with reduced motion: a still pose); drag or swipe sideways to turn it
+  // (touch-action pan-y: the page still scrolls), or the arrow keys.
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const theme = () => (document.documentElement.dataset.theme === "light" ? "light" : "dark") as "light" | "dark";
+  type Card = { cv: HTMLCanvasElement; kind: number; tt: ReturnType<typeof turntable> | null; turn: number; seen: boolean; drag: number };
+  const cardsEl = [...document.querySelectorAll<HTMLCanvasElement>("canvas.mon3d")].map((cv, i): Card => ({ cv, kind: +cv.dataset.kind!, tt: null, turn: -0.6 + i * 0.35, seen: false, drag: -1 }));
+  let raf = 0, last = 0;
+  const draw = (c: Card) => {
+    c.tt ??= turntable(c.cv, theme);
+    c.tt.draw(c.kind, LOOK0, null, c.turn, performance.now() / 1000);
+    c.cv.dataset.drawn = "1";
+  };
+  const loop = (t: number) => {
+    const dt = Math.min(0.05, (t - last) / 1000 || 0);
+    last = t;
+    raf = 0;
+    let any = false;
+    for (const c of cardsEl) if (c.seen) (any = true), c.drag < 0 && !calm && (c.turn += dt * 0.5), draw(c);
+    if (any && !calm) raf = requestAnimationFrame(loop);
+  };
+  const wake = () => void (raf || calm || (raf = requestAnimationFrame(loop)));
+  const io = new IntersectionObserver((es) => {
+    for (const e of es) {
+      const c = cardsEl.find((c) => c.cv === e.target)!;
+      c.seen = e.isIntersecting;
+      if (c.seen) draw(c);
+    }
+    wake();
+  }, { rootMargin: "120px 0px" });
+  for (const c of cardsEl) {
+    io.observe(c.cv);
+    c.cv.addEventListener("pointerdown", (e) => ((c.drag = e.clientX), c.cv.setPointerCapture?.(e.pointerId)));
+    c.cv.addEventListener("pointermove", (e) => {
+      if (c.drag < 0) return;
+      c.turn += (e.clientX - c.drag) * 0.012;
+      c.drag = e.clientX;
+      draw(c);
+    });
+    const up = () => void ((c.drag = -1), wake());
+    c.cv.addEventListener("pointerup", up);
+    c.cv.addEventListener("pointercancel", up);
+    c.cv.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      c.turn += e.key === "ArrowLeft" ? -0.3 : 0.3;
+      draw(c);
+    });
+  }
+  new ResizeObserver(() => cardsEl.forEach((c) => c.seen && c.tt && (c.tt.invalidate(), draw(c)))).observe(document.querySelector(".mons")!);
+  new MutationObserver(() => cardsEl.forEach((c) => c.seen && draw(c))).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  (window as unknown as { mons: unknown }).mons = cardsEl;
 </script>
