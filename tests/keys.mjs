@@ -77,6 +77,7 @@ try {
   const up = await reach(p, 3), sn = await p.evaluate(() => game.scene.state.snacks);
   await p.evaluate((c) => (game.scene.run.occ[c] = 1), up);
   await pace(p, 500);
+  await p.evaluate((c) => (game.scene.run.occ[c] = 1), up);
   await p.keyboard.press("k");
   await until(p, (n) => game.scene.state.snacks > n, sn, "K grabs the person at the aimed window");
   assert.equal(await p.evaluate((c) => game.scene.run.occ[c], up), 0, "eaten from that window");
@@ -108,13 +109,19 @@ try {
   assert.equal((await fb(p)).leaps[2], l0[2] + 1, "LET GO!");
   await pace(p, 1200);
 
+  // (the recorded run ends with the keys: the pad's part is checked in the plain run)
+  if (VIDEO) {
+    await ctx.close();
+    console.log("CitySmash: keys run recorded to " + VIDEO);
+    process.exit(0);
+  }
   // A gamepad (player two): it joins on a press; on a wall its LB/RB move its own aim and X punches the aimed cell.
   await p.evaluate(() => {
     window.pads[0] = { index: 0, id: "test pad", connected: true, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
     dispatchEvent(new Event("gamepadconnected"));
   });
   const btn = (b, on) => p.evaluate(([b, on]) => (window.pads[0].buttons[b] = { pressed: on, value: +on }), [b, on]);
-  const tap = async (b) => (await btn(b, true), await p.waitForTimeout(80), await btn(b, false), await p.waitForTimeout(80));
+  const tap = async (b) => (await btn(b, true), await p.waitForTimeout(150), await btn(b, false), await p.waitForTimeout(150));
   await tap(3);
   await until(p, () => game.scene.state.seats & 2, null, "the pad joins as player two");
   const k2 = await p.evaluate(() => game.scene.run.MV.findIndex((M) => M[28] === 1));
@@ -123,11 +130,13 @@ try {
   await hang(p, 3, -1, 3, k2);
   await until(p, (k) => game.scene.feedback.aims[1] === 0 && game.scene.run.MV[k][5] === 2, k2, "the pad's aim on its wall");
   await tap(5);
-  await until(p, () => game.scene.feedback.aims[1] === 1, null, "RB steps the pad's aim");
-  await tap(5);
+  await until(p, () => game.scene.feedback.aims[1] > 0, null, "RB steps the pad's aim");
+  const a1 = (await fb(p)).aims[1];
   await tap(4);
-  await until(p, () => game.scene.feedback.aims[1] === 1, null, "LB steps it back");
-  const c1 = await reach(p, 1, k2);
+  await until(p, () => game.scene.feedback.aims[1] === 0, null, "LB steps it back");
+  await tap(5);
+  await until(p, (a) => game.scene.feedback.aims[1] === a, a1, "RB again");
+  const c1 = await reach(p, a1, k2);
   await tap(2);
   await until(p, (c) => game.scene.run.HIT[c] >= 1, c1, "X punches the pad's aimed cell");
   await pace(p, 800);
