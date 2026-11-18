@@ -6,7 +6,7 @@
 // pancakes to rubble; the city flat brings the card and a punch loads city 2 (Coilworth), its unlocks
 // saved; the garage change and the cleared city survive a reload; the arrows drive the ape (no
 // shared-keyboard player two: one person a device); Recall gives the page back byte for byte. At 390 (touch): the pad is
-// the stick and JUMP only, its keys are 44 px or more, the play surface has touch-action none, the stick
+// the stick, PUNCH, GRAB and JUMP (v18), its keys are 44 px or more, the play surface has touch-action none, the stick
 // walks the ape, a tap on a window in reach chips it, a tap out of reach whiffs, a tap on a person in reach
 // eats them; portrait and landscape, every city's tallest building and the street fit the stage under
 // the HUD. Waits on state, never time.
@@ -139,7 +139,7 @@ try {
   assert.deepEqual(errs, [], "no page errors");
   await ctx.close();
 
-  // Phone: the pad (the stick and JUMP only), 44 px keys, touch-action none, the stick walks, taps smash and grab.
+  // Phone: the pad (the stick, PUNCH, GRAB and JUMP: v18, tests/touch.mjs), 44 px keys, touch-action none, the stick walks, taps smash and grab.
   const ph = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const q = await ph.newPage();
   await q.goto(server.url + "/");
@@ -148,7 +148,7 @@ try {
   await until(q, () => game.scene?.state.drawn, null, "phone: draws");
   const m = await q.evaluate(`(() => { const r = ${sr}; const keys = [...r.querySelectorAll('.cs-key, .cs-pad button')].filter((b) => b.offsetParent).map((b) => { const k = b.getBoundingClientRect(); return Math.min(k.width, k.height); }); const acts = [...r.querySelectorAll('.cs-pad button')].filter((b) => b.offsetParent).map((b) => b.getAttribute('aria-label') || b.textContent); return { pad: !!r.querySelector('.cs-pad').offsetParent, keys, acts, touch: getComputedStyle(r.querySelector('.cs-play')).touchAction }; })()`);
   assert.ok(m.pad, "phone: the pad shows");
-  assert.ok(m.acts.some((a) => /jump/i.test(a)) && !m.acts.some((a) => /punch|grab/i.test(a)), `phone: the pad has JUMP and no PUNCH or GRAB (${m.acts.join(" | ")})`);
+  assert.ok(m.acts.length === 3 && /punch/i.test(m.acts[0]) && /grab/i.test(m.acts[1]) && /jump/i.test(m.acts[2]), `phone: the pad has PUNCH, GRAB and JUMP (v18; ${m.acts.join(" | ")})`);
   assert.ok(m.keys.length >= 3 && m.keys.every((k) => k >= 44), `phone: keys ≥ 44 px (${m.keys.join(", ")})`);
   assert.equal(m.touch, "none", "phone: touch-action none");
   const stick = await q.evaluate(`(() => { const s = ${sr}.querySelector('.cs-pad .bui-stick, .cs-pad [class*=stick]'); const b = s.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })()`);
@@ -199,7 +199,7 @@ try {
     }
   }
   await ph.close();
-  console.log("CitySmash: browser green (title settles, garage + lock + code, start, climb + punch to a hole, eat, a building falls, city 2 loads, unlocks saved, the arrows drive the ape (no keyboard P2), reload persists (hair too), Recall, phone pad stick + JUMP, taps smash, whiff and eat, hero ≥ 1/5, full height at 390 portrait and landscape).");
+  console.log("CitySmash: browser green (title settles, garage + lock + code, start, climb + punch to a hole, eat, a building falls, city 2 loads, unlocks saved, the arrows drive the ape (no keyboard P2), reload persists (hair too), Recall, phone pad stick + PUNCH/GRAB/JUMP, taps smash, whiff and eat, hero ≥ 1/5, full height at 390 portrait and landscape).");
 } finally {
   await browser.close();
   await server.close();

@@ -13,7 +13,7 @@
     "check": "npm run build && npm run size",
     "test": "node --expose-gc --test --test-concurrency=1 tests/*.test.mjs",
     "test:settle": "node tests/settle.mjs",
-    "test:browser": "node tests/browser.mjs && node tests/keys.mjs && node tests/pose.mjs && node tests/layers.mjs && node tests/depth.mjs && node tests/perspective.mjs && node tests/pick.mjs && node tests/grab.mjs && node tests/practice.mjs && node tests/rivals.mjs && node tests/fight.mjs && node tests/levels.mjs && node tests/online.mjs && node tests/landscape.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/keys.mjs && node tests/pose.mjs && node tests/layers.mjs && node tests/depth.mjs && node tests/perspective.mjs && node tests/pick.mjs && node tests/grab.mjs && node tests/practice.mjs && node tests/rivals.mjs && node tests/fight.mjs && node tests/levels.mjs && node tests/online.mjs && node tests/landscape.mjs && node tests/touch.mjs",
     "site:dev": "astro dev --config site/astro.config.mjs",
     "site:build": "astro build --config site/astro.config.mjs && node scripts/pages.mjs",
     "test:site": "node tests/site.mjs"

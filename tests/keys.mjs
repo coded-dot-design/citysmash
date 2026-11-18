@@ -3,7 +3,7 @@
 // the 7 reach cells, J punches the aimed cell to a hole (the aim moves on past it), K grabs whoever is at the aimed
 // window, a mouse click on a reach cell moves the aim; Space leaps to the next building, a double Space lets go
 // and drops to the street; a gamepad's LB/RB move its own aim and X punches it; the menu's CONTROLS card and the
-// phone's pad (the stick and JUMP only) unchanged. VIDEO=<dir> records the run as a webm (slower, for a look).
+// phone's pad's keys (v18: PUNCH, GRAB, JUMP; tests/touch.mjs plays them) name their keys. VIDEO=<dir> records the run as a webm (slower, for a look).
 // Waits on state, never time (the pauses only pace the video).
 import assert from "node:assert/strict";
 import { readFileSync, mkdirSync } from "node:fs";
@@ -161,7 +161,7 @@ try {
   assert.deepEqual(errs, [], "no page errors");
   await ctx.close();
 
-  // The phone's pad: still the stick and JUMP only (labelled Space for a keyboard).
+  // The phone's pad (v18): the stick, PUNCH, GRAB and JUMP, labelled with their keys (J, K, Space).
   const ph = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const q = await ph.newPage();
   await q.goto(server.url + "/");
@@ -170,10 +170,10 @@ try {
   await q.evaluate(`${sr}.querySelector('[data-play]').click()`);
   await until(q, () => game.scene?.state.drawn, null, "phone: the run");
   const acts = await q.evaluate(`[...${sr}.querySelectorAll('.cs-pad button')].filter((b) => b.offsetParent).map((b) => b.getAttribute('aria-label') || b.textContent)`);
-  assert.equal(acts.length, 1, `phone: one action key (${acts.join(", ")})`);
-  assert.match(acts[0], /Jump/);
+  assert.equal(acts.length, 3, `phone: three action keys (v18: ${acts.join(", ")})`);
+  assert.match(acts.join(" | "), /Punch.*\(J\).*Grab.*\(K\).*Jump \(Space\)/);
   await ph.close();
-  console.log("CitySmash: keys green (keys only at 1440: the aim starts level close, E/Tab cycle the 7 cells and Q/Shift+Tab step back, J punches the aimed window to a hole and the aim moves on, K grabs at the aimed window, a click moves the aim, Space leaps to the next building, a double Space lets go to the street; a gamepad's LB/RB aim and X punch; the CONTROLS card; the phone's pad unchanged).");
+  console.log("CitySmash: keys green (keys only at 1440: the aim starts level close, E/Tab cycle the 7 cells and Q/Shift+Tab step back, J punches the aimed window to a hole and the aim moves on, K grabs at the aimed window, a click moves the aim, Space leaps to the next building, a double Space lets go to the street; a gamepad's LB/RB aim and X punch; the CONTROLS card; the phone's pad's three keys name theirs).");
 } finally {
   await browser.close();
   await server.close();
