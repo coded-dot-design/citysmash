@@ -34,7 +34,7 @@ npm run test:browser   # start, the garage, click and tap to smash (in reach, ou
 npm run site:build && npm run test:site
 ```
 
-Source: `src/block.ts` (the destructible buildings), `src/climber.ts` (the wall climber), `src/round.ts` (the run, headless: monsters, army, features, cities), `src/cities.ts` (the seven cities), `src/monster.ts` (the rigs), `src/fx.ts` (the particle kit), `src/paint.ts` (the people, the soldiers, the cracks and holes), `src/scene.ts` (a city on screen), `src/profile.ts` (the save), `src/net.ts` and `src/rollback.ts` (online), `src/game.ts` (title, garage, rooms).
+Source: `src/block.ts` (the destructible buildings), `src/climber.ts` (the wall climber), `src/round.ts` (the run, headless: monsters, army, features, cities), `src/cities.ts` (the seven cities), `src/monster.ts` (the rigs), `src/fx.ts` (the particle kit), `src/paint.ts` (the people, the soldiers, the cracks and holes), `src/scene.ts` (a city on screen), `src/profile.ts` (the save), `src/net.ts` and `src/rollback.ts` (online), `src/store.ts` and `src/store.css` (the garage as a store, on the shop kit in `vendor/shop/`: a synced copy, never edited here; `node vendor/shop/check.mjs` fails on drift), `src/game.ts` (title, rooms, the shell).
 
 Copyright (c) Chris Cooley. All rights reserved ([LICENSE](LICENSE)). Versions published before this
 change were MIT and stay MIT for anyone who has a copy; the Fizlet engine (`@fzlt/core`) is MIT.
