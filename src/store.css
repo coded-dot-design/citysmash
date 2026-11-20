@@ -46,6 +46,9 @@
 .cs .cs-gside .shop-tabs{gap:4px 16px}
 .cs .cs-gside .shop-tab{font-size:14px}
 .cs .cs-sbar h2{display:none}
+.cs .cs-rail .cs-tile{padding:6px 5px;font-size:9.5px}
+.cs .cs-rail .cs-cost{font-size:10px;letter-spacing:0}
+.cs .cs-rail .cs-cost .shop-i{position:absolute;top:8px;right:9px;width:13px;height:13px;padding:1px;border-radius:4px;background:var(--shop-panel)}
 }
 @container cards (max-width:600px){
 .cs .cs-garage{padding:8px 12px;gap:8px}
