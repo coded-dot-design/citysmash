@@ -1,6 +1,6 @@
 # CitySmash
 
-A giant cyber ape climbs and smashes his way across seven tabletop cities, day into night. A game by [Chris Cooley](https://coded.design/), built on [Fizlet](https://fizlet.com/). Play at <https://citysmash.domvirus.com>.
+A giant cyber ape climbs and smashes his way across seven tabletop cities, day into night. A game by [Chris Cooley](https://coded.design/), built on [Fizlet](https://fizlet.com/). Play at <https://citysmash.fzlt.games>.
 
 ## The game
 
@@ -21,7 +21,7 @@ const game = createCitySmash({ host: document.getElementById("game"), rooms: "ws
 
 `dist/citysmash.js` is the same as one script (global `citysmash`). No runtime dependencies: the Fizlet bricks it uses are bundled. `game.destroy()` gives the page back exactly as it was.
 
-Online play talks to a fizlet-rooms server (`rooms`, or `?rooms=` on the page; the site's default is in `site/src/site.ts`, `PUBLIC_ROOMS_URL` overrides it at build). The server must allow this site's origin, `https://citysmash.domvirus.com`.
+Online play talks to a fizlet-rooms server (`rooms`, or `?rooms=` on the page; the site's default is in `site/src/site.ts`, `PUBLIC_ROOMS_URL` overrides it at build). The server must allow this site's origin, `https://citysmash.fzlt.games`.
 
 ## Develop
 
@@ -36,4 +36,5 @@ npm run site:build && npm run test:site
 
 Source: `src/block.ts` (the destructible buildings), `src/climber.ts` (the wall climber), `src/round.ts` (the run, headless: monsters, army, features, cities), `src/cities.ts` (the seven cities), `src/monster.ts` (the rigs), `src/fx.ts` (the particle kit), `src/paint.ts` (the people, the soldiers, the cracks and holes), `src/scene.ts` (a city on screen), `src/profile.ts` (the save), `src/net.ts` and `src/rollback.ts` (online), `src/game.ts` (title, garage, rooms).
 
-MIT © Chris Cooley.
+Copyright (c) Chris Cooley. All rights reserved ([LICENSE](LICENSE)). Versions published before this
+change were MIT and stay MIT for anyone who has a copy; the Fizlet engine (`@fzlt/core`) is MIT.

@@ -7,9 +7,9 @@ export default defineConfig({
   srcDir: root + "site/src",
   publicDir: root + "site/public",
   outDir: root + "artifacts/pages",
-  // Custom domain: SITE_URL=https://citysmash.domvirus.com and SITE_BASE=/ (pages.yml defaults).
-  site: process.env.SITE_URL || "https://coded-dot-design.github.io",
-  base: process.env.SITE_BASE || "/citysmash",
+  // Custom domain: SITE_URL=https://citysmash.fzlt.games and SITE_BASE=/ (pages.yml defaults).
+  site: process.env.SITE_URL || "https://citysmash.fzlt.games",
+  base: process.env.SITE_BASE || "/",
   trailingSlash: "always",
   output: "static",
   devToolbar: { enabled: false },

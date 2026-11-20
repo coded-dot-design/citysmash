@@ -5,7 +5,7 @@ export const VERSION: string = pkg.version;
 export const FIZLET: string = build.fizlet;
 /** The game's measured size (gzip bytes of dist/citysmash.mjs, written by scripts/build.mjs). */
 export const GZIP: number = build.gzip["citysmash.mjs"];
-export const REPO = "https://github.com/coded-dot-design/citysmash";
+export const REPO = "https://github.com/fizlet/citysmash";
 export const FIZLET_URL = "https://fizlet.com/";
 export const HUB = "https://domvirus.com/";
 // The fizlet-rooms server for online play (owner-deployed; ?rooms= on the play page overrides it).

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "CitySmash: a giant cyber ape climbs and smashes his way across seven tabletop cities. Built on Fizlet, by Chris Cooley.",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "author": "Chris Cooley (https://coded.design/)",
   "scripts": {
     "typecheck": "tsc --noEmit",
