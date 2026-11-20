@@ -87,8 +87,8 @@
 .cs .cs-story p,.cs .cs-obody>p{margin:0;max-width:40em;font-weight:700;line-height:1.4;color:var(--muted)}
 .cs .cs-mbody{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
 .cs .cs-story{display:grid;gap:12px}
-.cs .cs-actions,.cs .cs-sizes,.cs .cs-gtabs,.cs .cs-hostjoin{display:flex;flex-wrap:wrap;gap:8px;margin:0}
-.cs .cs-actions .bui-key,.cs .cs-sizes .bui-key,.cs .cs-gtabs .bui-key,.cs .cs-hostjoin .bui-key,.cs .cs-rooms .bui-key{min-height:44px;min-width:44px;padding:0 1em;font:inherit}
+.cs .cs-actions,.cs .cs-sizes,.cs .cs-hostjoin{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.cs .cs-actions .bui-key,.cs .cs-sizes .bui-key,.cs .cs-hostjoin .bui-key,.cs .cs-rooms .bui-key{min-height:44px;min-width:44px;padding:0 1em;font:inherit}
 .cs .cs-big{font-size:1.15em;padding:0 1.4em!important}
 .cs .cs-sub{margin:0;font-size:.82em;letter-spacing:.1em;color:var(--muted)}
 .cs [aria-pressed="true"].bui-key{background:#22e6ff;color:#0b0a14}
@@ -103,20 +103,6 @@
 .cs .cs-cityk span{font-size:.74em;opacity:.85}
 .cs .cs-cityk[disabled]{opacity:.45}
 .cs .cs-note{margin:0;padding:.5em .7em;background:#ffd166;color:#0b0a14;border:2px solid var(--rim);border-radius:8px;max-width:36em}
-.cs .cs-gbody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
-.cs .cs-gview{position:relative;display:grid;justify-items:center;gap:8px}
-.cs .cs-pvwrap{width:100%;aspect-ratio:1 / 1;max-height:60vh;border:2.5px solid var(--rim);border-radius:14px;overflow:hidden;box-shadow:calc(5px * var(--bui-sx,1)) calc(5px * var(--bui-sy,1)) 0 var(--bui-shadow,#000)}
-.cs .cs-preview{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
-.cs .cs-mname{font-size:1.3em;letter-spacing:.06em;rotate:-1.5deg;padding:.1em .5em;background:#ff4fa8;color:#0b0a14;border:2px solid var(--rim);border-radius:8px}
-.cs .cs-gside{display:grid;gap:12px}
-.cs .cs-opts{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
-.cs .cs-opt{min-width:44px;min-height:44px;padding:0 .8em;font:inherit;font-size:.92em;display:inline-flex;align-items:center;gap:.4em}
-.cs .cs-opt small{font-size:.7em;opacity:.8}
-.cs .cs-opt[data-locked]{opacity:.55;border-style:dashed}
-.cs .cs-sw i{display:block;width:1.2em;height:1.2em;border-radius:50%;background:var(--c);border:2px solid var(--rim)}
-.cs .cs-code{display:grid;gap:6px}
-.cs .cs-code textarea{font:600 12px/1.3 ui-monospace,Menlo,monospace;padding:.5em;border:2px solid var(--rim);border-radius:8px;background:var(--surface);color:var(--ink);resize:vertical;word-break:break-all}
-.cs .cs-code .bui-key{justify-self:start;min-height:44px;padding:0 1em;font:inherit}
 .cs .cs-obody{display:grid;gap:12px;max-width:44em}
 .cs .cs-field{display:grid;gap:4px;font-size:.8em;letter-spacing:.1em;color:var(--muted)}
 .cs .cs-field input{font:800 16px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;padding:.6em .7em;min-height:44px;box-sizing:border-box;border:2px solid var(--rim);border-radius:8px;background:var(--surface);color:var(--ink);max-width:22em}
@@ -137,8 +123,7 @@
 .cs .cs-seats i{display:block;width:1em;height:1em;border-radius:50%;background:var(--seat);border:2px solid var(--rim)}
 .cs .cs-seats small{font-size:.72em;color:var(--muted)}
 @media (max-width:720px){
-.cs .cs-mbody,.cs .cs-gbody{grid-template-columns:1fr}
-.cs .cs-pvwrap{max-height:44vh;aspect-ratio:4 / 3}
+.cs .cs-mbody{grid-template-columns:1fr}
 .cs .cs-screen{padding:10px 12px 16px;gap:12px}
 .cs .cs-cities{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -149,7 +134,7 @@
 .cs .cs-dots{display:flex;gap:5px;margin:2px 0 0}
 .cs .cs-dots i{width:10px;height:10px;border-radius:50%;border:1.5px solid #22e6ff}
 .cs .cs-dots i.cs-done{background:#22e6ff}
-.cs .cs-story .cs-note,.cs .cs-gside .cs-note{color:#0b0a14}
+.cs .cs-story .cs-note{color:#0b0a14}
 .cs .cs-story .cs-explain{margin-top:-6px;font-size:.88em;color:var(--ink)}
 .cs .cs-ctrls ul{margin:4px 0 10px;padding:0;list-style:none;font-size:.86em;line-height:1.55;color:var(--ink)}
 .cs .cs-ctrls kbd{font:inherit;font-weight:800;padding:0 .35em;border:1px solid currentColor;border-radius:4px}
@@ -161,6 +146,4 @@
 .cs .cs-padmon{min-height:44px;padding:0 .7em;font:inherit;font-size:.82em}
 .cs .cs-friends{display:inline-grid;align-content:center;line-height:1.1;padding:.3em 1em!important}
 .cs .cs-friends small{font-size:.66em;letter-spacing:.06em;opacity:.85}
-.cs .cs-mons .cs-sw i{background:linear-gradient(135deg,var(--c) 55%,var(--t) 55%)}
-.cs .cs-mons .cs-sil i{background:#0b0a14;border-style:dashed}
 .cs .cs-pads .cs-who{grid-template-columns:1fr}

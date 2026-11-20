@@ -12,10 +12,12 @@ import { lockTouch } from "@fzlt/core/touch";
 import type { Transport } from "@fzlt/core/presence";
 import { mountScene, SEAT_C, type Scene } from "./scene.ts";
 import { CITIES, NCITY } from "./cities.ts";
-import { monName, rivalDress, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS, RIVAL_C } from "./monster.ts";
+import { monName, rivalDress, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS } from "./monster.ts";
 import { turntable } from "./turntable.ts";
 import { AI, NM, LEVELS } from "./round.ts";
 import { load, save, local, fresh, clearCity, startable, endRun, setPart, partName, unlockedBy, exportCode, importCode, beat, setMon, setRival, cast, type Profile, type Store, type Part } from "./profile.ts";
+import { storeCard, tabFor, ownedMons, type Tab } from "./store.ts";
+import { esc, num } from "../vendor/shop/shop.js";
 import { encode, decode, NI, packMode, unpackMode, joinRoom, rollback, lookBits, takeLook, lookOf, GONE, B_GONE, SEATS, LOOK_FRAMES, type Rollback } from "./net.ts";
 
 /** v14: the controls card on the menu (keys only, or keys and the mouse: both always work). */
@@ -32,10 +34,6 @@ export interface CitySmashOptions {
   rooms?: string;
 }
 type Screen = "menu" | "garage" | "play" | "online";
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-const num = (n: number) => n.toLocaleString("en-US");
-type Tab = Part | "code" | "rc" | "rt";
-const TABS: [Part, string, number][] = [["fur", "FUR", FURS.length], ["trim", "TRIM", TRIMS.length], ["pattern", "PATTERN", PATTERNS.length], ["face", "FACE", FACES.length], ["hair", "HAIR", HAIRS.length], ["gear", "GEAR", GEAR.length]];
 const TOD = ["DAY", "DUSK", "NIGHT"];
 const ROOM_N = 16;
 
@@ -156,37 +154,6 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     const who = PADS.n ? `<section class="cs-pads" aria-label="Players on this screen"><p class="cs-sub">PLAYERS ON THIS SCREEN</p><p class="cs-explain">Same screen: you, plus one player for each gamepad. Nobody joined on a pad: ${profile.rivals ? "the computer plays that monster." : "it sits out."}</p><ol class="cs-who"><li class="cs-in" style="--seat:${SEAT_C[0]}"><i>P1</i><b>${esc(monOf())}</b><small>READY · Keys: WASD move · Space jump · J punch · K grab · Q/E aim · or mouse/tap</small></li>${padRows}</ol></section>` : "";
     return `<section class="cs-screen cs-menu" aria-label="CitySmash">${head()}<div class="cs-mbody"><div class="cs-story"><h2>Climb it. Smash it. Eat the snacks.</h2><p>You are a giant cyber ape. Jump at a building's side and hang on: your inside arm grips, your outside arm smashes the windows by your climb. Three hits a window. Enough holes and the whole thing pancakes. Seven cities, day into night. Beat a rival monster and it is yours to play.</p><div class="cs-actions"><button type="button" class="bui-key bui-go cs-big" data-play>▶ SMASH ${esc(CITIES[start]!.name)}</button><button type="button" class="bui-key" data-practice>PRACTICE</button><button type="button" class="bui-key" data-go="garage">GARAGE</button><button type="button" class="bui-key cs-friends" data-go="online"><b>PLAY WITH FRIENDS</b><small>ONLINE · EACH ON THEIR OWN DEVICE</small></button></div><p class="cs-sizes"><button type="button" class="bui-key cs-riv" data-rivals aria-pressed="${!!profile.rivals}">CPU RIVALS: ${profile.rivals ? "ON" : "OFF"}</button></p><p class="cs-explain">Computer rivals: the monsters nobody picked join as AI.</p><p class="cs-sizes cs-levels" role="group" aria-label="Difficulty">${LEVELS.map((l, i) => `<button type="button" class="bui-key" data-level="${i}" aria-pressed="${profile.level === i}">${l}</button>`).join("")}</p><p class="cs-explain">${LEVEL_SAY[profile.level]}</p>${CONTROLS}${who}${note ? `<p class="cs-note">${esc(note)}</p>` : ""}</div><ol class="cs-cities" aria-label="Start from">${cities}</ol></div></section>`;
   }
-  function garageCard() {
-    const lk = profile.look, mon = profile.mon;
-    if (mon === 0 ? tab === "rc" || tab === "rt" : tab !== "code" && tab !== "rc" && tab !== "rt") tab = mon ? "rc" : "fur";
-    // Your monster: the ape always; a rival once you have beaten it in a one-player run (a silhouette till then).
-    const mons = [0, 1, 2, 3].map((k) => {
-      const own = owns("mon", k), c = k ? RIVAL_C[k - 1]! : [FURS[lk.fur]!.c, TRIMS[lk.trim]!.c];
-      return `<li><button type="button" class="bui-key cs-opt cs-sw cs-monk${own ? "" : " cs-sil"}" data-mon="${k}" aria-pressed="${mon === k}"${own ? "" : ` data-locked aria-label="${RIVALS[k - 1]}, locked: beat it in a city to unlock"`} style="--c:${own ? c[0] : "#0b0a14"};--t:${own ? c[1] : "#4a4466"}"><i></i><span>${k ? RIVALS[k - 1] : "THE APE"}</span>${own ? "" : "<small>🔒 Beat it in a city to unlock</small>"}</button></li>`;
-    }).join("");
-    let side = "";
-    if (tab === "code") side = `<div class="cs-code"><label for="cs-code">Your save code: copy it to move your monsters to another device.</label><textarea id="cs-code" rows="4" readonly>${exportCode(profile)}</textarea><label for="cs-in">Paste a code to load it:</label><textarea id="cs-in" rows="3"></textarea><button type="button" class="bui-key" data-import>LOAD CODE</button></div>`;
-    else if (tab === "rc" || tab === "rt") {
-      // A rival's colour (its own, or a fur you own) and its trim (its own, or a neon you own).
-      const j = tab === "rt" ? 1 : 0, P = j ? TRIMS : FURS, cur = profile.rlook[(mon - 1) * 2 + j]!, k = j ? "trim" : "fur";
-      side = `<ul class="cs-opts cs-${k}">${[-1, ...P.map((_, i) => i)].map((i) => {
-        const own = i < 0 || owns(k, i), sw = i < 0 ? RIVAL_C[mon - 1]![j]! : P[i]!.c, name = i < 0 ? "ITS OWN" : P[i]!.name.toUpperCase(), by = unlockedBy(`${k}:${i}`);
-        return `<li><button type="button" class="bui-key cs-opt cs-sw" data-rpart="${j}" data-i="${i}" aria-pressed="${cur === i}"${own ? "" : ` data-locked aria-label="${esc(name)}: flatten ${esc(CITIES[by]?.name ?? "")} to unlock"`} style="--c:${sw}"><i></i><span>${esc(name)}</span>${own ? "" : `<small>🔒 ${esc(CITIES[by]?.name ?? "")}</small>`}</button></li>`;
-      }).join("")}</ul>`;
-    } else {
-      const [k, , n] = TABS.find((t) => t[0] === tab)!;
-      const list = (k: Part, n: number) => `<ul class="cs-opts cs-${k}">${Array.from({ length: n }, (_, i) => {
-        const own = owns(k, i), on = k === "gear" ? (lk.gear & (1 << i)) > 0 : lk[k as "fur"] === i, by = unlockedBy(`${k}:${i}`);
-        const sw = k === "fur" ? FURS[i]!.c : k === "trim" || k === "hairc" ? TRIMS[i]!.c : "";
-        const name = k === "fur" ? FURS[i]!.name : k === "trim" || k === "hairc" ? TRIMS[i]!.name : k === "pattern" ? PATTERNS[i]!.name : k === "face" ? FACES[i]!.name : k === "hair" ? HAIRS[i]!.name : GEAR[i]!.name;
-        return `<li><button type="button" class="bui-key cs-opt${sw ? " cs-sw" : ""}" data-part="${k}" data-i="${i}" aria-pressed="${on}"${own ? "" : ` data-locked aria-label="${esc(name)}: flatten ${esc(CITIES[by]?.name ?? "")} to unlock"`}${sw ? ` style="--c:${sw}"` : ""}>${sw ? `<i></i><span>${esc(name.toUpperCase())}</span>` : esc(name.toUpperCase())}${own ? "" : `<small>🔒 ${esc(CITIES[by]?.name ?? "")}</small>`}</button></li>`;
-      }).join("")}</ul>`;
-      // The hair tab: the style, then one colour for it (the neon palette).
-      side = list(k, n) + (k === "hair" ? `<p class="cs-sub">HAIR COLOUR</p>${list("hairc", TRIMS.length)}` : "");
-    }
-    const tabs: [Tab, string][] = mon ? [["rc", "COLOUR"], ["rt", "TRIM"]] : TABS.map(([k, l]) => [k, l]);
-    return `<section class="cs-screen cs-garage" aria-label="Garage">${head()}<div class="cs-gbody"><div class="cs-gview"><div class="cs-pvwrap"></div><b class="cs-mname">${esc(monOf())}</b></div><div class="cs-gside"><p class="cs-sub">YOUR MONSTER · BEAT THEM TO PLAY THEM</p><ul class="cs-opts cs-mons" aria-label="Your monster">${mons}</ul><p class="cs-gtabs" role="group" aria-label="Garage tabs">${tabs.map(([k, label]) => `<button type="button" class="bui-key" data-tab="${k}" aria-pressed="${tab === k}">${label}</button>`).join("")}<button type="button" class="bui-key" data-tab="code" aria-pressed="${tab === "code"}">SAVE CODE</button></p>${side}${note ? `<p class="cs-note">${esc(note)}</p>` : ""}<p class="cs-actions"><button type="button" class="bui-key" data-go="menu">◂ BACK</button>${mon ? "" : `<button type="button" class="bui-key" data-random>RANDOM</button>`}<button type="button" class="bui-key bui-go" data-play>▶ SMASH</button></p></div></div></section>`;
-  }
   function onlineCard() {
     return `<section class="cs-screen cs-online" aria-label="Online" data-step="pick">${head()}<div class="cs-obody"><h2>Play together online.</h2><p class="cs-sub">UP TO FOUR SCREENS · ONE RUN · THE HOST IS THE APE, THE OTHERS TAKE THE RIVALS</p>`
       + `<form class="cs-pick" data-for="pick" novalidate><label class="cs-field">INVITE CODE<input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="64" placeholder="SMASH-XXXX-XXXX" /></label><p class="cs-hostjoin"><button type="submit" class="bui-key bui-go" value="host"><b>HOST</b><small>OPEN A ROOM, SEND THE LINK</small></button><button type="submit" class="bui-key" value="join"><b>JOIN</b><small>A ROOM SOMEONE OPENED</small></button></p><p class="cs-say" role="alert"></p></form>`
@@ -200,8 +167,14 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     cards.hidden = screen === "play";
     sceneEl.hidden = screen !== "play";
     if (screen === "play") return void (cards.innerHTML = "");
-    cards.innerHTML = screen === "menu" ? menuCard() : screen === "garage" ? garageCard() : onlineCard();
+    // The garage is a store on the shop kit (./store.ts): its tokens come with the kit's root class. A repaint
+    // keeps the list where it was scrolled to.
+    const at = cards.querySelector(".cs-panel")?.scrollTop ?? 0;
+    cards.classList.toggle("shop", screen === "garage");
+    if (screen === "garage") tab = tabFor(profile.mon, tab);
+    cards.innerHTML = screen === "menu" ? menuCard() : screen === "garage" ? storeCard(profile, tab, note) : onlineCard();
     if (screen === "garage") {
+      cards.querySelector(".cs-panel")!.scrollTop = at;
       cards.querySelector(".cs-pvwrap")!.append(pv);
       pvKey = "";
       requestAnimationFrame(preview);
@@ -461,7 +434,15 @@ export function createCitySmash(o: CitySmashOptions = {}) {
     if (d.start) return (start = +d.start), paint();
     if ("rivals" in d) return (profile = { ...profile, rivals: profile.rivals ? 0 : 1 }), keep(), paint();
     if (d.level) return (profile = { ...profile, level: +d.level }), keep(), paint(), void (cards.querySelector(`[data-level="${d.level}"]`) as HTMLElement | null)?.focus();
-    if (d.tab) return (tab = d.tab as Tab), (note = ""), paint();
+    // The header's SAVE CODE key opens the code and, pressed again, closes it.
+    if (d.tab) return (tab = d.tab === "code" && tab === "code" ? "fur" : (d.tab as Tab)), (note = ""), paint(), void (cards.querySelector(`[data-tab="${d.tab}"]`) as HTMLElement | null)?.focus();
+    if (d.turn) {
+      // The turntable's ‹ ›: the next monster you own.
+      const own = ownedMons(profile);
+      profile = setMon(profile, own[(own.indexOf(profile.mon) + +d.turn + own.length) % own.length]!);
+      (note = ""), keep(), paint(), spin();
+      return void (cards.querySelector(`[data-turn="${d.turn}"]`) as HTMLElement | null)?.focus();
+    }
     if (d.part) {
       const k = d.part as Part, i = +d.i!;
       if ("locked" in d) {

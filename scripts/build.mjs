@@ -1,6 +1,6 @@
 // dist/citysmash.mjs (module) and dist/citysmash.js (one script for any page, global citysmash):
-// the game, the Fizlet bricks it uses (@fzlt/core, bundled: no runtime dependencies) and the Board
-// UI kit's CSS.
+// the game, the Fizlet bricks it uses (@fzlt/core, bundled: no runtime dependencies), the Board UI
+// kit's CSS, and the shop kit the garage is built on (vendor/shop/: its pieces and its CSS).
 import { build, transform } from "esbuild";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -12,7 +12,7 @@ const core = JSON.parse(readFileSync(require.resolve("@fzlt/core/package.json"),
 rmSync("dist", { recursive: true, force: true });
 mkdirSync("dist");
 const css = async (file) => (await transform(readFileSync(file, "utf8"), { loader: "css", minify: true })).code.trim();
-const kit = await css(require.resolve("@fzlt/core/ui/board-ui.css")), game = await css("src/game.css");
+const kit = await css(require.resolve("@fzlt/core/ui/board-ui.css")), game = (await Promise.all(["src/game.css", "vendor/shop/shop.css", "src/store.css"].map(css))).join("");
 const common = {
   define: { __KIT_CSS__: JSON.stringify(kit), __GAME_CSS__: JSON.stringify(game) },
   bundle: true, minify: true, target: "es2022", legalComments: "none", logLevel: "warning",
