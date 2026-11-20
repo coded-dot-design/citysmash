@@ -610,3 +610,217 @@ export declare function mountCatalogue(host: HTMLElement, cfg: CatalogueConfig, 
     state: CatalogueState;
     destroy: () => void;
 };
+/** The version of this copy; a game can print it beside its ORIGIN.json commit. */
+export declare const VERSION = "0.2.0";
+export type PriceState = "price" | "owned" | "equipped" | "free" | "locked";
+export interface PriceWords {
+    owned: string;
+    equipped: string;
+    free: string;
+    locked: string;
+    credits: string;
+    need: string;
+}
+export declare const PRICE_WORDS: PriceWords;
+export interface Price {
+    price?: number;
+    credits?: number;
+    state?: PriceState;
+    cur?: string;
+    words?: Partial<PriceWords>;
+}
+/** The state a price shows: the one given, else "price" above zero and "free" at zero; "short" when the wallet can't pay. */
+export declare const priceState: (o: Price) => PriceState | "short";
+/** A price in words (a card's aria-label): "1,200 credits, 300 more needed", "Owned", "Locked, 900 credits". */
+export declare const priceLabel: (o: Price) => string;
+/** A price tag: `priceTag({ price: 80, credits, cur: "◈ " })`. Always something: the price (greyed when
+ *  short), "Owned", "In use", "Free", or a lock with the price it will cost. */
+export declare const priceTag: (o: Price) => string;
+/** The wallet chip: `wallet({ amount: 1200, cur: "◈ ", label: "Credits" })`; `amount: Infinity` reads ∞;
+ *  `test` adds the small TEST badge (test credits), never a second chip. */
+export declare const wallet: (o: {
+    amount: number;
+    cur?: string;
+    label: string;
+    test?: string | boolean;
+}) => string;
+/** A header key: one height with the wallet; with an icon its words fold away under 1100 px (the label stays for screen readers). */
+export declare const headKey: (o: {
+    label: string;
+    icon?: string;
+    attrs?: string;
+    on?: boolean;
+}) => string;
+/** The Day / Night key: shows the theme you are in; `attrs` toggles it. */
+export declare const themeKey: (dark: boolean, attrs: string, words?: [string, string]) => string;
+/** The header: `storeHead({ brand, tabs: tabs(…, true), keys: [wallet(…), themeKey(…)] })`. Brand left, tabs centred, keys right. */
+export declare const storeHead: (o: {
+    brand: string;
+    tabs?: string;
+    keys?: string[];
+}) => string;
+/** The tag over the stage's corner ("PREVIEW · Night shift"): an overlay, never a row, so it never moves the stage. */
+export declare const stageTag: (text: string, word?: string) => string;
+/** The stage: the game's canvas or picture in the turntable frame; `tag` and `extra` (a chipPick) lie over it. */
+export declare const stage: (o: {
+    inner: string;
+    label?: string;
+    key?: string;
+    arrows?: boolean;
+    tag?: string;
+    extra?: string;
+}) => string;
+/** The action bar under the detail: what it costs on the left, the keys on the right (Buy last). */
+export declare const actionBar: (text: string, keys: string[]) => string;
+export interface StoreConfig {
+    /** `storeHead(…)`. */
+    head: string;
+    /** `stage(…)`: top of the side panel, the same box on every tab. */
+    stage: string;
+    /** Under the stage: the name, stats, the owned grid. Scrolls inside itself. */
+    detail?: string;
+    /** Docked under the detail, always in view: `actionBar(…)` or a `cta(…)`. */
+    action?: string;
+    /** The body's tabs (`tabs(…)`), fixed above the body. */
+    tabs?: string;
+    /** The grid or list. Scrolls inside itself; `mountStore` keeps its scroll across redraws. */
+    body: string;
+    /** The open tab's id (`data-tab` on the root, for the game's own CSS). */
+    tab?: string;
+    /** A CSS image behind the store (`url(…)` or a gradient): the shell lays a scrim over it. */
+    backdrop?: string;
+    attrs?: string;
+    cls?: string;
+}
+/** The store: never wider than 1440 px; on a desktop-sized window exactly one screen (the page never
+ *  scrolls, the detail and the body scroll inside themselves); on a phone it stacks, the stage pinned
+ *  under the header and the action bar docked at the bottom. */
+export declare const storeShell: (o: StoreConfig) => string;
+export interface ItemCard {
+    name: string;
+    art?: string;
+    sub?: string;
+    price?: Price;
+    stages?: string;
+    on?: boolean;
+    off?: boolean;
+    attrs: string;
+    tag?: string;
+}
+/** A card: `itemCard({ name, art, price: { price: 80, credits }, on, attrs: 'data-pick="a"' })`. One button
+ *  (never a key inside it); `on` rings it in the buy colour (--shop-go) without moving or resizing it;
+ *  its price state is always on it; `stages` takes `stages(n, of)` (the upgrade diamonds). */
+export declare const itemCard: (o: ItemCard) => string;
+/** A grid of equal cards: `cardGrid(items.map(itemCard), "Paint")`; `min` is a card's least width in px. With no cards, pass `empty` (an `emptyState`). */
+export declare const cardGrid: (cards: string[], label: string, o?: {
+    min?: number;
+    empty?: string;
+}) => string;
+export interface OwnedWords {
+    inUse: string;
+    sell: string;
+    sellFor: string;
+    cancel: string;
+    credits: string;
+    need: string;
+}
+export declare const OWNED_WORDS: OwnedWords;
+export interface OwnedItem {
+    name: string;
+    art?: string;
+    on?: boolean;
+    /** The tile's own key: select it. */
+    attrs: string;
+    /** Sell: `open` toggles the token's popover, which is the confirm (`yes` sells, `no` closes). Leave it out when the thing can't be sold. */
+    sell?: {
+        value: number;
+        open?: boolean;
+        attrs: string;
+        yes: string;
+        no: string;
+    } | null;
+}
+/** Everything owned in one grid of equal tiles: each a key (press it to use it, the one in use ringed),
+ *  a quiet sell token in its corner, then one add tile for the empty places and the expansion with its
+ *  price. `ownedGrid({ title: "My things", items, add: { label: "+ Add", attrs, count: 2 }, credits })`. */
+export declare function ownedGrid(o: {
+    title: string;
+    line?: string;
+    items: OwnedItem[];
+    add?: {
+        label: string;
+        attrs: string;
+        count?: number;
+    } | null;
+    expand?: {
+        label: string;
+        price: number;
+        attrs: string;
+    } | null;
+    credits: number;
+    cur?: string;
+    words?: Partial<OwnedWords>;
+}): string;
+export interface CompareRow {
+    label: string;
+    values: string[];
+    nums?: number[];
+    better?: 1 | -1 | 0;
+    digits?: number;
+}
+/** `compareTable({ label, items: [{ name, price }, …], rows })`: every column's price stays in its head;
+ *  each cell keeps a delta line against the first column (empty when there is no change, so a row never
+ *  changes height); `better` says which way wins (1 up, −1 down). */
+export declare function compareTable(o: {
+    label: string;
+    items: {
+        name: string;
+        price?: Price;
+    }[];
+    rows: CompareRow[];
+}): string;
+/** "Nothing here yet" with its one key: `emptyState({ icon: "cart", title: "No parts yet", line: "…", key: btn("Shop", …) })`. */
+export declare const emptyState: (o: {
+    icon?: string;
+    title: string;
+    line?: string;
+    key?: string;
+}) => string;
+export interface SlotOption {
+    id: string;
+    label: string;
+    meta?: string;
+    attrs: string;
+    icon?: string;
+}
+/** A slot's picker that is honest about what it holds: no options, the `empty` key (or a quiet line when
+ *  it has no attrs); one option, a plain label (nothing to pick); two or more, the dropdown and its menu. */
+export declare const slotPick: (o: {
+    label: string;
+    options: SlotOption[];
+    on?: string;
+    open?: boolean;
+    attrs: string;
+    empty: {
+        label: string;
+        attrs?: string;
+        icon?: string;
+    };
+}) => string;
+export interface StoreMount {
+    draw(): void;
+    destroy(): void;
+}
+/** Mounts a store: `mountStore(host, { render: () => storeShell(…), press: (key) => route(key.dataset), dismiss: () => closeMenus() })`.
+ *  - `press(key, event)` gets the key pressed (a button or link in the host); return false for "not mine, no redraw".
+ *  - Every redraw keeps the scroll of each `[data-scroll]` panel and of the page, and puts the focus back
+ *    on the same key (matched by its id, else its data attributes): a pick never jumps or scrolls to the top.
+ *  - Popovers (anything whose key has aria-expanded): `dismiss()` closes what the game has open and
+ *    says whether anything was. Escape and a press outside call it; the focus goes back to the key that
+ *    opened it; when one opens, the focus moves to its picked option.
+ *  - `--shop-store-headh` on the host is the header's height (the phone's pinned stage sits under it). */
+export declare function mountStore(host: HTMLElement, o: {
+    render: () => string;
+    press: (key: HTMLElement, e: Event) => unknown;
+    dismiss?: () => boolean;
+}): StoreMount;
