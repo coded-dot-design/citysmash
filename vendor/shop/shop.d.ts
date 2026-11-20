@@ -145,7 +145,8 @@ export declare const chipPick: (label: string, items: readonly (readonly [string
  *  `label` for screen readers, `aria-expanded`); open, a popover over the tile with its line (`body`,
  *  raw HTML, already escaped) and its keys (raw HTML: the action and a cancel). Sits on the tile's
  *  wrapper (position: relative), never inside the tile's own key, so it never presses the tile. The
- *  game owns `open`, Escape, a press outside and the focus. */
+ *  game owns `open`, Escape, a press outside and the focus. Drawn 30 px (`small`: 22 px, for small cards);
+ *  either way its hit area is at least 44 px. */
 export declare const cornerPop: (o: {
     label: string;
     attrs: string;
@@ -154,6 +155,7 @@ export declare const cornerPop: (o: {
     open?: boolean;
     body?: string;
     keys?: string;
+    small?: boolean;
 }) => string;
 /** The main call to action: `cta("LET'S RIDE", 'class-extra', "Race · Endless · Free ride · Track day")`; `cls` adds the screen's hook class. */
 export declare const cta: (label: string, cls?: string, sub?: string, attrs?: string) => string;
@@ -611,7 +613,7 @@ export declare function mountCatalogue(host: HTMLElement, cfg: CatalogueConfig, 
     destroy: () => void;
 };
 /** The version of this copy; a game can print it beside its ORIGIN.json commit. */
-export declare const VERSION = "0.2.0";
+export declare const VERSION = "0.3.0";
 export type PriceState = "price" | "owned" | "equipped" | "free" | "locked";
 export interface PriceWords {
     owned: string;
@@ -660,7 +662,7 @@ export declare const storeHead: (o: {
     keys?: string[];
 }) => string;
 /** The tag over the stage's corner ("PREVIEW · Night shift"): an overlay, never a row, so it never moves the stage. */
-export declare const stageTag: (text: string, word?: string) => string;
+export declare const stageTag: (text: string, word?: string, cls?: string) => string;
 /** The stage: the game's canvas or picture in the turntable frame; `tag` and `extra` (a chipPick) lie over it. */
 export declare const stage: (o: {
     inner: string;
@@ -689,6 +691,9 @@ export interface StoreConfig {
     tab?: string;
     /** A CSS image behind the store (`url(…)` or a gradient): the shell lays a scrim over it. */
     backdrop?: string;
+    /** "window" (the default): the shell is the page, sized by the window. "box": it fills the element it
+     *  is in (which must have a height: under a site header, in a panel) and sizes everything from that box. */
+    fit?: "window" | "box";
     attrs?: string;
     cls?: string;
 }
@@ -696,6 +701,15 @@ export interface StoreConfig {
  *  scrolls, the detail and the body scroll inside themselves); on a phone it stacks, the stage pinned
  *  under the header and the action bar docked at the bottom. */
 export declare const storeShell: (o: StoreConfig) => string;
+/** A key tile's rows, laid out by the kit (the art, the name, a small line, a foot): the body of `itemCard`,
+ *  and of any `keyTile({ cls: "shop-ic", body: tileRows(…) })` a game builds itself. `tag` lies over the art. */
+export declare const tileRows: (o: {
+    art?: string;
+    name: string;
+    sub?: string;
+    foot?: string;
+    tag?: string;
+}) => string;
 export interface ItemCard {
     name: string;
     art?: string;
@@ -703,11 +717,19 @@ export interface ItemCard {
     price?: Price;
     stages?: string;
     on?: boolean;
-    off?: boolean;
     attrs: string;
+    /** A word over the art's corner ("New"); it is not part of the label. */
     tag?: string;
+    /** Disabled: it can't be pressed at all. */
+    off?: boolean;
+    /** Locked but pressable (the press shows how to unlock it): dashed and dimmed, `data-locked`, never disabled. */
+    locked?: boolean;
+    /** What a screen reader hears, in place of "name, sub: price" ("Thing, locked: finish X to unlock"). */
+    label?: string;
+    /** The game's own class on the key. */
+    cls?: string;
 }
-/** A card: `itemCard({ name, art, price: { price: 80, credits }, on, attrs: 'data-pick="a"' })`. One button
+/** A card: `itemCard({ name, art, price: { price: 80, credits }, on, attrs: 'data-sel="a"' })`. One button
  *  (never a key inside it); `on` rings it in the buy colour (--shop-go) without moving or resizing it;
  *  its price state is always on it; `stages` takes `stages(n, of)` (the upgrade diamonds). */
 export declare const itemCard: (o: ItemCard) => string;
@@ -729,6 +751,11 @@ export interface OwnedItem {
     name: string;
     art?: string;
     on?: boolean;
+    /** Not yours yet: its art is a silhouette, this word under a lock ("Beat it"); it can still be pressed (for
+     *  its note), is never "in use" and has no sell token. */
+    locked?: string;
+    /** What a screen reader hears, in place of the name ("Thing, locked: beat it to unlock"). */
+    label?: string;
     /** The tile's own key: select it. */
     attrs: string;
     /** Sell: `open` toggles the token's popover, which is the confirm (`yes` sells, `no` closes). Leave it out when the thing can't be sold. */

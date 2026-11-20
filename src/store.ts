@@ -33,7 +33,7 @@ function tile(o: { attrs: string; name: string; art: string; cost: string; own: 
 /** A part's card (the kit's itemCard: one key, ringed in the go colour when worn) with its price tag: the city
  *  that unlocks it under a lock, and the same city (or STARTER) once it is yours, worn or not. */
 const part = (o: { attrs: string; name: string; art: string; word: string; own: boolean; on: boolean; corner?: string }) =>
-  itemCard({ name: o.name, art: o.art, on: o.on, attrs: o.attrs + (o.own ? "" : " data-locked"), price: { state: o.own ? (o.on ? "equipped" : "owned") : "locked", words: { owned: o.word, equipped: o.word, locked: o.word } } }) + (o.corner ?? "");
+  itemCard({ name: o.name, art: o.art, on: o.on, attrs: o.attrs, locked: !o.own, label: o.own ? undefined : `${o.name}: flatten ${o.word} to unlock`, price: { state: o.own ? (o.on ? "equipped" : "owned") : "locked", words: { owned: o.word, equipped: o.word, locked: o.word } } }) + (o.corner ?? "");
 
 /** The garage screen for profile `p` on `tab`, with `note` (why a press was refused, or a code's result). */
 export function storeCard(p: Profile, tab: Tab, note: string): string {
@@ -51,7 +51,7 @@ export function storeCard(p: Profile, tab: Tab, note: string): string {
     return part({
       attrs: `data-part="${k}" data-i="${i}"`, name, art: sw ? swatch(sw) : icon(ICON_OF[k] ?? "paint"), word: cityOf(tag) || "STARTER", own, on,
       // Gear is worn bit by bit: a worn bit has its remove key in the card's corner (the card itself takes it off too).
-      corner: k === "gear" && on ? cornerPop({ label: `Remove ${name}`, attrs: `data-part="gear" data-i="${i}" data-off`, glyph: "×" }) : "",
+      corner: k === "gear" && on ? cornerPop({ label: `Remove ${name}`, attrs: `data-part="gear" data-i="${i}" data-off`, glyph: "×", small: true }) : "",
     });
   }), k === "hairc" ? "Hair colour" : k, { min: 118 });
   let side: string;
