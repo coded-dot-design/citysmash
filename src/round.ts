@@ -11,7 +11,7 @@
 // helicopters; then the city's feature (a gunboat, a train, floodlights, surges, trucks, neon, two
 // helicopters). Deterministic: one seeded random in the state, fixed inputs → the same run; every
 // number in typed arrays (`bytes`: the rollback saves and restores them); zero allocation per step.
-import { createBlock, STAND, FALL, RUBBLE, HOLE, STREET0, STREET1, E_CHIP, E_CRACK, type Block } from "./block.ts";
+import { createBlock, STAND, RUBBLE, HOLE, STREET0, STREET1, E_CHIP, E_CRACK, type Block } from "./block.ts";
 import { createClimber, WALK, AIR, CLIMB, ROOF, KO, ZS, HAND, CLIMB_TOP, G, OUT, IN, WAIT, E_LEAP, LEAP_TAP } from "./climber.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, SKYPORT } from "./cities.ts";
 
@@ -1531,7 +1531,6 @@ export function createRun(seed = 20261116) {
     }
     return -1;
   }
-  void [FALL, RUBBLE, STREET1];
 
   MV[0]![28] = 0;
   for (let k = 1; k < NM; k++) MV[k]![28] = AI;

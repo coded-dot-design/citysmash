@@ -190,4 +190,3 @@ export function createClimber(bk: Block, h: ClimberHooks) {
   }
   return { step, wallAt, hang, dropOff, leap };
 }
-export type Climber = ReturnType<typeof createClimber>;

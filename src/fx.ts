@@ -47,7 +47,6 @@ export function pool(d: Diorama, cap: number, color: string, layer: number) {
   }
   return { P, puff, step, ring, clear: () => void (P.n = 0) };
 }
-export type Pool = ReturnType<typeof pool>;
 
 /** The wreckage pools together: glass, chunks of wall, sparks, smoke, dust. */
 export function wreckage(d: Diorama, c: { dust: string; smoke: string; chunk: string; shard: string; spark: string }) {

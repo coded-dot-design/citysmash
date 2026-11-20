@@ -8,14 +8,13 @@
 // kernel's ledger, so Recall gives the page back.
 import { createEngine } from "@fzlt/core/kernel";
 import { mount as buiMount } from "@fzlt/core/ui";
-import { diorama } from "@fzlt/core/diorama";
 import { lockTouch } from "@fzlt/core/touch";
 import type { Transport } from "@fzlt/core/presence";
 import { mountScene, SEAT_C, type Scene } from "./scene.ts";
 import { CITIES, NCITY } from "./cities.ts";
-import { heroName, shade, monName, rivalDress, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS, RIVAL_WHAT, RIVAL_C } from "./monster.ts";
+import { monName, rivalDress, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS, RIVAL_C } from "./monster.ts";
 import { turntable } from "./turntable.ts";
-import { AI, NM, DONE, LEVELS } from "./round.ts";
+import { AI, NM, LEVELS } from "./round.ts";
 import { load, save, local, fresh, clearCity, startable, endRun, setPart, partName, unlockedBy, exportCode, importCode, beat, setMon, setRival, cast, type Profile, type Store, type Part } from "./profile.ts";
 import { encode, decode, NI, packMode, unpackMode, joinRoom, rollback, lookBits, takeLook, lookOf, GONE, B_GONE, SEATS, LOOK_FRAMES, type Rollback } from "./net.ts";
 
@@ -420,7 +419,6 @@ export function createCitySmash(o: CitySmashOptions = {}) {
           decode(b, p, NIN);
         }
         sc.stepNet(NIN, liveRun);
-        void f;
       },
       confirm: (inputs, f) => {
         if (f < LOOK_FRAMES) {
@@ -556,4 +554,3 @@ export function createCitySmash(o: CitySmashOptions = {}) {
   };
 }
 export type CitySmash = ReturnType<typeof createCitySmash>;
-void [shade, RIVAL_WHAT, DONE];
