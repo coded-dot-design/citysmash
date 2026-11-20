@@ -16,7 +16,7 @@ const kit = await css(require.resolve("@fzlt/core/ui/board-ui.css")), game = awa
 const common = {
   define: { __KIT_CSS__: JSON.stringify(kit), __GAME_CSS__: JSON.stringify(game) },
   bundle: true, minify: true, target: "es2022", legalComments: "none", logLevel: "warning",
-  banner: { js: `/* CitySmash ${version} · MIT © Chris Cooley · built on Fizlet ${core} */` },
+  banner: { js: `/* CitySmash ${version} · © Chris Cooley, all rights reserved · built on Fizlet ${core} */` },
 };
 await build({ ...common, entryPoints: ["src/index.ts"], format: "esm", outfile: "dist/citysmash.mjs" });
 await build({ ...common, entryPoints: ["src/index.ts"], format: "iife", globalName: "citysmash", outfile: "dist/citysmash.js" });
