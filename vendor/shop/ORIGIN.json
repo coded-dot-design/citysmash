@@ -1,0 +1,32 @@
+{
+  "note": "Generated copy. Do not edit: change it at the source, then sync it again.",
+  "source": "shop",
+  "commit": "1bef7662f5ed0c0e2aae3de1f24131486c94851f",
+  "date": "2026-11-20",
+  "files": [
+    {
+      "path": "shop.js",
+      "bytes": 29048,
+      "gzip": 10273,
+      "sha256": "ac61a3620b02f86e8496fade9ef73b7afd70facba29a148e1d080d3eb4460293"
+    },
+    {
+      "path": "shop.d.ts",
+      "bytes": 26096,
+      "gzip": 8135,
+      "sha256": "ae11018fe9ced8e8589c4fd32095db7aa09740010b2d450b402738d5cfdb47f7"
+    },
+    {
+      "path": "shop.css",
+      "bytes": 34107,
+      "gzip": 6562,
+      "sha256": "d24dc20e8bff5a4e025e1f481104749e87f6522a235d40e3699f70d70f1378f1"
+    },
+    {
+      "path": "check.mjs",
+      "bytes": 1160,
+      "gzip": 590,
+      "sha256": "9d9a9d07cd5d2e3a65da0447b58e0a2a2c1cfbdc8e18b26a35459f84145bc6c3"
+    }
+  ]
+}
