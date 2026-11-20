@@ -1,12 +1,12 @@
 // The garage as a store, on the shop kit (../vendor/shop/, the one HOLESHOT's garage is built on): the
 // monster on its turntable (the kit's frame, ‹ › through the monsters you own), your monsters as one
-// rail, the ape's parts (or a rival's colour and trim) as tabs of key tiles, the save code. Every item
+// rail, the ape's parts (or a rival's colour and trim) as tabs of the kit's item cards with its price tags, the save code. Every item
 // and every rule is the game's own (./monster.ts, ./profile.ts): CitySmash has no currency, so a part's
 // price is the city you flatten to unlock it (a rival's: beating it), and that price stays on its card
 // once it is yours. A card is one key: press it to wear the part; the worn one is ringed in the go
 // colour; a gear bit you wear also has a quiet remove key in its corner. Strings in, a string out:
 // ./game.ts paints it and owns the clicks.
-import { badge, btn, card, cornerPop, esc, heading, icon, keyTile, num, pill, stages, swatch, tabs, turntable } from "../vendor/shop/shop.js";
+import { btn, card, cardGrid, cornerPop, esc, heading, icon, itemCard, keyTile, num, pill, stages, swatch, tabs, turntable } from "../vendor/shop/shop.js";
 import { CITIES, NCITY } from "./cities.ts";
 import { monName, FURS, TRIMS, PATTERNS, FACES, GEAR, HAIRS, RIVALS, RIVAL_C } from "./monster.ts";
 import { exportCode, unlockedBy, type Part, type Profile } from "./profile.ts";
@@ -30,7 +30,10 @@ const cityOf = (tag: string) => CITIES[unlockedBy(tag)]?.name ?? "";
 function tile(o: { attrs: string; name: string; art: string; cost: string; own: boolean; on: boolean; label?: string; cls?: string; corner?: string }) {
   return `<div class="cs-cell" role="listitem">${keyTile({ body: `${o.art}<b>${esc(o.name)}</b>${o.cost}`, attrs: o.attrs + (o.own ? "" : " data-locked"), label: o.own ? undefined : o.label, down: o.on, pick: o.on, pressed: o.on, cls: "cs-tile" + (o.cls ? " " + o.cls : "") })}${o.corner ?? ""}</div>`;
 }
-const grid = (tiles: string[], label: string, cls = "") => `<div class="cs-grid${cls ? " " + cls : ""}" role="list" aria-label="${esc(label)}">${tiles.join("")}</div>`;
+/** A part's card (the kit's itemCard: one key, ringed in the go colour when worn) with its price tag: the city
+ *  that unlocks it under a lock, and the same city (or STARTER) once it is yours, worn or not. */
+const part = (o: { attrs: string; name: string; art: string; word: string; own: boolean; on: boolean; corner?: string }) =>
+  itemCard({ name: o.name, art: o.art, on: o.on, attrs: o.attrs + (o.own ? "" : " data-locked"), price: { state: o.own ? (o.on ? "equipped" : "owned") : "locked", words: { owned: o.word, equipped: o.word, locked: o.word } } }) + (o.corner ?? "");
 
 /** The garage screen for profile `p` on `tab`, with `note` (why a press was refused, or a code's result). */
 export function storeCard(p: Profile, tab: Tab, note: string): string {
@@ -41,25 +44,25 @@ export function storeCard(p: Profile, tab: Tab, note: string): string {
     return tile({ attrs: `data-mon="${k}"`, name, art: swatch(own ? c[0]! : "#0b0a14", own ? c[1]! : "#4a4466"), cost: cost(k ? (own ? "BEATEN" : "BEAT IT") : "STARTER", own), own, on: mon === k, label: `${name}, locked: beat it in a city to unlock`, cls: own ? "" : "cs-sil" });
   });
   /** The ape's parts of one kind. */
-  const parts = (k: Part, n: number) => grid(Array.from({ length: n }, (_, i) => {
-    const tag = `${k}:${i}`, own = owns(k, i), on = k === "gear" ? (lk.gear & (1 << i)) > 0 : lk[k as "fur"] === i, city = cityOf(tag);
+  const parts = (k: Part, n: number) => cardGrid(Array.from({ length: n }, (_, i) => {
+    const tag = `${k}:${i}`, own = owns(k, i), on = k === "gear" ? (lk.gear & (1 << i)) > 0 : lk[k as "fur"] === i;
     const sw = k === "fur" ? FURS[i]!.c : k === "trim" || k === "hairc" ? TRIMS[i]!.c : "";
     const name = (k === "fur" ? FURS[i]!.name : k === "trim" || k === "hairc" ? TRIMS[i]!.name : k === "pattern" ? PATTERNS[i]!.name : k === "face" ? FACES[i]!.name : k === "hair" ? HAIRS[i]!.name : GEAR[i]!.name).toUpperCase();
-    return tile({
-      attrs: `data-part="${k}" data-i="${i}"`, name, art: sw ? swatch(sw) : badge(ICON_OF[k] ?? "paint"), cost: cost(city || "STARTER", own), own, on, label: `${name}: flatten ${city} to unlock`,
+    return part({
+      attrs: `data-part="${k}" data-i="${i}"`, name, art: sw ? swatch(sw) : icon(ICON_OF[k] ?? "paint"), word: cityOf(tag) || "STARTER", own, on,
       // Gear is worn bit by bit: a worn bit has its remove key in the card's corner (the card itself takes it off too).
       corner: k === "gear" && on ? cornerPop({ label: `Remove ${name}`, attrs: `data-part="gear" data-i="${i}" data-off`, glyph: "×" }) : "",
     });
-  }), k === "hairc" ? "Hair colour" : k, k === "fur" || k === "trim" || k === "hairc" ? "cs-sws" : "");
+  }), k === "hairc" ? "Hair colour" : k, { min: 118 });
   let side: string;
   if (tab === "code") side = card(`<div class="cs-code"><label for="cs-code">Your save code: copy it to move your monsters to another device.</label><textarea id="cs-code" rows="4" readonly>${exportCode(p)}</textarea><label for="cs-in">Paste a code to load it:</label><textarea id="cs-in" rows="3"></textarea>${btn("LOAD CODE", "data-import")}</div>`);
   else if (tab === "rc" || tab === "rt") {
     // A rival's colour (its own, or a fur you own) and its trim (its own, or a neon you own).
     const j = tab === "rt" ? 1 : 0, P = j ? TRIMS : FURS, cur = p.rlook[(mon - 1) * 2 + j]!, k = j ? "trim" : "fur";
-    side = grid([-1, ...P.map((_, i) => i)].map((i) => {
-      const own = i < 0 || owns(k, i), name = i < 0 ? "ITS OWN" : P[i]!.name.toUpperCase(), city = i < 0 ? "" : cityOf(`${k}:${i}`);
-      return tile({ attrs: `data-rpart="${j}" data-i="${i}"`, name, art: swatch(i < 0 ? RIVAL_C[mon - 1]![j]! : P[i]!.c), cost: cost(city || "STARTER", own), own, on: cur === i, label: `${name}: flatten ${city} to unlock` });
-    }), j ? "Trim" : "Colour", "cs-sws");
+    side = cardGrid([-1, ...P.map((_, i) => i)].map((i) => {
+      const own = i < 0 || owns(k, i), name = i < 0 ? "ITS OWN" : P[i]!.name.toUpperCase();
+      return part({ attrs: `data-rpart="${j}" data-i="${i}"`, name, art: swatch(i < 0 ? RIVAL_C[mon - 1]![j]! : P[i]!.c), word: (i < 0 ? "" : cityOf(`${k}:${i}`)) || "STARTER", own, on: cur === i });
+    }), j ? "Trim" : "Colour", { min: 118 });
   } else {
     const [k, , n] = TABS.find((t) => t[0] === tab)!;
     // The hair tab: the style, then one colour for it (the neon palette).

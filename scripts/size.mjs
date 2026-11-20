@@ -19,11 +19,11 @@ import { readdirSync, readFileSync } from "node:fs";
 // Raised to 94,000 for v15 (EASY / MEDIUM / HARD: the level's table, the rivals' reaction, rests, taunts and turn beat,
 // the menu's picker and the HUD chip, the profile's level and its migration, the level in the room's mode):
 // citysmash.mjs 91,117 → 92,078 B, citysmash.js 91,354 → 92,304 B (CHANGELOG).
-// Raised to 104,000 for the garage as a store on the shop kit (vendor/shop/, the kit HOLESHOT's garage is built on):
-// citysmash.mjs 92,947 → 102,380 B, citysmash.js 93,161 → 102,602 B. Of the 9,433 B: the kit's stylesheet, which ships
-// whole (34,107 B minified, 6,668 B gzip on its own), the kit pieces the store uses (4,746 B minified) and the store's
-// own layout (src/store.css, 1,370 B gzip on its own), less the hand-built garage they replace.
-const BUDGET = 104_000;
+// Raised to 106,000 for the garage as a store on the shop kit (vendor/shop/ 0.2.0, the kit HOLESHOT's garage is built
+// on): citysmash.mjs 92,947 → 104,604 B, citysmash.js 93,161 → 104,813 B. Of the 11,657 B: the kit's stylesheet, which
+// ships whole (43,435 B minified, 8,218 B gzip on its own), the kit pieces the store uses (6,318 B minified) and the
+// store's own layout (src/store.css, 1,544 B gzip on its own), less the hand-built garage they replace.
+const BUDGET = 106_000;
 let failed = false;
 for (const file of readdirSync("dist").filter((f) => /\.m?js$/.test(f)).sort().map((f) => `dist/${f}`)) {
   const gz = gzipSync(readFileSync(file)).length, ok = gz <= BUDGET;

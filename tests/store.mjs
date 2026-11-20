@@ -86,7 +86,7 @@ try {
         assert.equal(await on(p, (r, t) => r.querySelector(`[data-tab=${t}]`).getAttribute("aria-pressed"), t), "true", `${at}: the ${t} tab`);
         assert.deepEqual(await rect(p, ".shop-turn"), pv0, `${at}: the turntable stays put on ${t}`);
         await fits(`the ${t} tab`);
-        if (t !== "code") assert.equal(await on(p, (r) => [...r.querySelectorAll(".cs-tile")].every((b) => b.querySelector(".cs-cost")?.textContent.trim().length > 2)), true, `${at}: a price on every ${t} card`);
+        if (t !== "code") assert.equal(await on(p, (r) => [...r.querySelectorAll(".cs-panel .shop-ic")].every((b) => b.querySelector(".shop-price-tag")?.textContent.trim().length > 2) && [...r.querySelectorAll(".cs-rail .cs-tile")].every((b) => b.querySelector(".cs-cost")?.textContent.trim().length > 2)), true, `${at}: a price on every ${t} card`);
         if (t !== "fur") await shot(t);
       }
       const n = await on(p, (r) => ({ fur: r.querySelectorAll("[data-part=fur]").length, locked: r.querySelectorAll("[data-part=fur][data-locked]").length, mons: r.querySelectorAll(".cs-rail [data-mon]").length, min: Math.min(...[...r.querySelectorAll(".cs-garage button")].map((b) => { const q = b.getBoundingClientRect(); return b.classList.contains("shop-corner-k") ? 44 : Math.min(q.width, q.height); })) }));
@@ -99,7 +99,7 @@ try {
         const b = r.querySelector('[data-part=fur][data-i="1"]'), go = getComputedStyle(r.querySelector(".cs-garage")).getPropertyValue("--shop-go").trim(), probe = document.createElement("i");
         probe.style.color = go; r.querySelector(".cs-garage").append(probe);
         const want = getComputedStyle(probe).color; probe.remove();
-        return { fur: game.profile.look.fur, pressed: b.getAttribute("aria-pressed"), pick: b.hasAttribute("data-pick"), border: getComputedStyle(b).borderTopColor === want, picks: r.querySelectorAll("[data-part=fur][data-pick]").length, focus: r.activeElement === b, cost: b.querySelector(".cs-cost").textContent.trim(), list: r.querySelector(".cs-panel").scrollTop, cards: r.querySelector(".cs-cards").scrollTop };
+        return { fur: game.profile.look.fur, pressed: b.getAttribute("aria-pressed"), pick: b.hasAttribute("data-pick"), border: getComputedStyle(b).borderTopColor === want, picks: r.querySelectorAll("[data-part=fur][data-pick]").length, focus: r.activeElement === b, cost: b.querySelector(".shop-price-tag").textContent.trim(), list: r.querySelector(".cs-panel").scrollTop, cards: r.querySelector(".cs-cards").scrollTop };
       });
       assert.deepEqual(sel, { fur: 1, pressed: "true", pick: true, border: true, picks: 1, focus: true, cost: "STARTER", list: 0, cards: 0 }, `${at}: ASH worn, its card ringed in the go colour, its price still on it, the focus kept, nothing scrolled`);
       assert.deepEqual(await rect(p, ".shop-turn"), pv0, `${at}: nothing jumps on a select`);
@@ -109,11 +109,11 @@ try {
       await click(p, '[data-part=fur][data-i="5"]');
       assert.equal(await p.evaluate(() => game.profile.look.fur), 1, `${at}: a locked fur is refused`);
       assert.match(await on(p, (r) => r.querySelector(".cs-note").textContent), /Locked: flatten BRIGHTFIELD to unlock DUNE FUR/);
-      assert.equal(await on(p, (r) => r.querySelector('[data-part=fur][data-i="5"] .cs-cost').textContent.trim()), "BRIGHTFIELD", `${at}: its price is the city`);
+      assert.equal(await on(p, (r) => r.querySelector('[data-part=fur][data-i="5"] .shop-price-tag').textContent.trim()), "BRIGHTFIELD", `${at}: its price is the city`);
       assert.deepEqual([await rect(p, ".shop-turn"), await rect(p, '[data-part=fur][data-i="5"]')], [pv0, r5], `${at}: the note moves nothing`);
       await fits("the note");
       await shot("locked");
-      for (const s of [".cs-note", ".cs-cost", ".cs-tile b", ".shop-tab", ".shop-btn", ".cs-mname", ".shop-meta"]) {
+      for (const s of [".cs-note", ".cs-cost", ".cs-tile b", ".shop-price-tag", ".shop-ic-n", ".shop-tab", ".shop-btn", ".cs-mname", ".shop-meta"]) {
         const c = await contrast(p, `.cs-garage ${s}`);
         assert.ok(c >= 4.5, `${at}: ${s} passes AA (${c.toFixed(2)})`);
       }
@@ -129,17 +129,17 @@ try {
       await click(p, "[data-tab=code]");
       assert.equal(await on(p, (r) => r.querySelector("[data-tab=fur]").getAttribute("aria-pressed")), "true", `${at}: SAVE CODE again closes the code`);
       await click(p, '[data-part=fur][data-i="5"]');
-      assert.deepEqual(await on(p, (r) => { const b = r.querySelector('[data-part=fur][data-i="5"]'); return [game.profile.look.fur, b.hasAttribute("data-locked"), b.hasAttribute("data-pick"), b.querySelector(".cs-cost").textContent.trim(), r.querySelectorAll("[data-part=fur][data-locked]").length]; }), [5, false, true, "BRIGHTFIELD", 6], `${at}: DUNE is paid for and worn; its price stays on the card`);
+      assert.deepEqual(await on(p, (r) => { const b = r.querySelector('[data-part=fur][data-i="5"]'); return [game.profile.look.fur, b.hasAttribute("data-locked"), b.hasAttribute("data-pick"), b.querySelector(".shop-price-tag").textContent.trim(), r.querySelectorAll("[data-part=fur][data-locked]").length]; }), [5, false, true, "BRIGHTFIELD", 6], `${at}: DUNE is paid for and worn; its price stays on the card`);
 
       // Gear: worn bit by bit; a worn bit's quiet remove key sits in the card's corner.
       await click(p, "[data-tab=gear]");
-      await click(p, '.cs-tile[data-part=gear][data-i="2"]');
-      const gear = await on(p, (r) => { const c = r.querySelector('.cs-tile[data-part=gear][data-i="2"]').parentElement, k = c.querySelector(".shop-corner-k"), a = c.getBoundingClientRect(), b = k.getBoundingClientRect(); return { on: (game.profile.look.gear & 4) > 0, label: k.getAttribute("aria-label"), corner: b.right <= a.right && b.top >= a.top && b.left > a.left + a.width / 2 && b.bottom < a.top + a.height / 2 + 12 }; });
+      await click(p, '.shop-ic[data-part=gear][data-i="2"]');
+      const gear = await on(p, (r) => { const c = r.querySelector('.shop-ic[data-part=gear][data-i="2"]').parentElement, k = c.querySelector(".shop-corner-k"), a = c.getBoundingClientRect(), b = k.getBoundingClientRect(); return { on: (game.profile.look.gear & 4) > 0, label: k.getAttribute("aria-label"), corner: b.right <= a.right && b.top >= a.top && b.left > a.left + a.width / 2 && b.bottom < a.top + a.height / 2 + 12 }; });
       assert.equal(gear.on && gear.corner, true, `${at}: the gear is worn, its remove key in the card's top right corner`);
       assert.match(gear.label, /^Remove /);
       await shot("gear-worn");
       await click(p, '.shop-corner-k[data-part=gear][data-i="2"]');
-      assert.deepEqual(await on(p, (r) => [(game.profile.look.gear & 4) > 0, !!r.querySelector('.shop-corner-k[data-i="2"]'), r.activeElement === r.querySelector('.cs-tile[data-part=gear][data-i="2"]')]), [false, false, true], `${at}: removed from the corner; the focus goes to its card`);
+      assert.deepEqual(await on(p, (r) => [(game.profile.look.gear & 4) > 0, !!r.querySelector('.shop-corner-k[data-i="2"]'), r.activeElement === r.querySelector('.shop-ic[data-part=gear][data-i="2"]')]), [false, false, true], `${at}: removed from the corner; the focus goes to its card`);
 
       // The monsters: one rail; a rival you own is a press away, and ‹ › step through the ones you own.
       assert.deepEqual(await on(p, (r) => [0, 1, 2, 3].map((k) => r.querySelector(`.cs-rail [data-mon="${k}"]`).hasAttribute("data-locked"))), [false, false, true, true]);
@@ -201,7 +201,7 @@ try {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
     const [p] = await open(ctx, "/dark");
     await until(p, () => game.engine.paused.includes("settled"), null, "the garage settles");
-    assert.equal(await on(p, (r) => getComputedStyle(r.querySelector(".cs-tile")).transitionDuration), "0s", "reduced motion: the keys do not ease");
+    assert.equal(await on(p, (r) => getComputedStyle(r.querySelector(".shop-ic")).transitionDuration), "0s", "reduced motion: the keys do not ease");
     await ctx.close();
   }
   console.log("CitySmash: store green (on the shop kit; 1440 and 390, dark and light: fits the stage, the turntable fixed across tabs and presses, a card is the key, the worn card ringed in the go colour, a price on every card, a locked part refused, a flattened city pays, gear's corner remove, the monsters' rail and ‹ ›, keyboard and touch, AA, reload persists; a phone on its side and a box on a page; reduced motion).");
