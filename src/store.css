@@ -31,8 +31,7 @@
 .cs .cs-cost{display:flex;align-items:center;gap:4px;font:600 11px/1.2 var(--shop-mono);letter-spacing:.04em;color:var(--shop-mute)}
 .cs .cs-cost[data-locked]{color:var(--shop-price)}
 .cs .cs-tile[data-locked]{border-style:dashed;box-shadow:none}
-.cs .cs-tile[data-locked] .shop-swatch,.cs .shop-ic[data-locked] .shop-ic-art{opacity:.5}
-.cs .shop-ic[data-locked]{border-style:dashed;box-shadow:none}
+.cs .cs-tile[data-locked] .shop-swatch{opacity:.5}
 .cs .shop-ic[data-pick]{cursor:pointer}
 .cs .shop-cards>li{position:relative}
 .cs .shop-ic-art{aspect-ratio:auto;height:34px}
@@ -40,7 +39,6 @@
 .cs .shop-ic-sub:empty{display:none}
 .cs .shop-ic-f>i{display:none}
 .cs .shop-ic .shop-price-tag{font:700 11px/1.3 var(--shop-mono);letter-spacing:.03em;padding:3px 6px;max-width:100%;box-sizing:border-box;overflow:hidden}
-.cs .shop-ic .shop-price-tag[data-state=equipped]{background:var(--shop-tile);color:var(--shop-ink)}
 .cs .cs-tile[data-pick]{cursor:pointer}
 .cs .shop-cards .shop-corner{top:9px}
 .cs .cs-foot{display:flex;align-items:center;gap:10px;min-height:44px;margin:0}
@@ -74,7 +72,6 @@
 .cs .shop-ic-art{height:16px}
 .cs .shop-ic-n{font-size:11.5px}
 .cs .shop-cards .shop-corner{top:7px;right:2px}
-.cs .shop-cards .shop-corner-k{width:20px;height:20px;font-size:11px}
 .cs .shop-ic-f{min-height:16px}
 .cs .shop-ic .shop-price-tag{font-size:9.5px;letter-spacing:0;padding:2px 4px;gap:2px}
 .cs .shop-ic .shop-price-tag .shop-i{width:10px;height:10px}

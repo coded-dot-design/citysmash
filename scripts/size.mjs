@@ -23,7 +23,9 @@ import { readdirSync, readFileSync } from "node:fs";
 // on): citysmash.mjs 92,947 → 104,604 B, citysmash.js 93,161 → 104,813 B. Of the 11,657 B: the kit's stylesheet, which
 // ships whole (43,435 B minified, 8,218 B gzip on its own), the kit pieces the store uses (6,318 B minified) and the
 // store's own layout (src/store.css, 1,544 B gzip on its own), less the hand-built garage they replace.
-const BUDGET = 106_000;
+// Lowered to 101,000 with kit 0.3.0: the build now ships only the kit rules whose classes the bundle writes
+// (vendor/shop/shop-css.mjs pickCss, scripts/build.mjs): citysmash.mjs 104,908 → 99,217 B, citysmash.js 105,120 → 99,435 B.
+const BUDGET = 101_000;
 let failed = false;
 for (const file of readdirSync("dist").filter((f) => /\.m?js$/.test(f)).sort().map((f) => `dist/${f}`)) {
   const gz = gzipSync(readFileSync(file)).length, ok = gz <= BUDGET;
