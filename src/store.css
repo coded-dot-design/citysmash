@@ -51,7 +51,7 @@
 .cs .cs-garage{padding:8px 12px;gap:8px}
 .cs .cs-gbody{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:8px}
 .cs .cs-gview{grid-template-rows:auto auto;gap:8px}
-.cs .cs-gview .shop-turn{height:clamp(110px,27cqh,300px)}
+.cs .cs-gview .shop-turn{height:clamp(110px,30cqh,300px)}
 .cs .cs-gside{gap:6px}
 .cs .cs-gside .shop-tabs{gap:4px 14px;justify-content:space-between}
 .cs .cs-gside .shop-tab{font-size:13px}

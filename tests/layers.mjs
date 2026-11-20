@@ -31,6 +31,7 @@ const COVER = `window.cover = (dio, cv, rig, i, draw) => {
   draw();
   return whole ? +(1 - shown / whole).toFixed(3) : -1;
 };`;
+// A hair under 0 is none covered (an arm's soft edge can count a pixel more against the body than alone); -1 is no arm at all.
 try {
   for (const [w, h] of [[1440, 900], [390, 844]]) {
     const p = await browser.newPage({ viewport: { width: w, height: h } });
@@ -55,7 +56,7 @@ try {
       const at = `${w}: garage, turned ${o.t}°`;
       if (Math.abs(o.side) > 0.5) {
         const near = o.side > 0 ? o.R : o.L, far = o.side > 0 ? o.L : o.R;
-        assert.ok(near >= 0 && near < 0.12, `${at}: the near arm draws over the torso (${near} covered)`);
+        assert.ok(near > -0.01 && near < 0.12, `${at}: the near arm draws over the torso (${near} covered)`);
         assert.ok(far > 0.3, `${at}: the far arm is behind the torso (${far} covered)`);
       } else if (o.front > 0.5) assert.ok(o.L < 0.12 && o.R < 0.12, `${at}: facing the camera, both arms draw over the torso (${o.L}, ${o.R} covered)`);
     }
@@ -88,7 +89,7 @@ try {
       return out;
     });
     if (process.env.LAYERS_DEBUG) console.log(w, JSON.stringify(run));
-    assert.ok(run.street.near >= 0 && run.street.near < 0.12, `${w}: street: the near arm draws over the body (${run.street.near} covered)`);
+    assert.ok(run.street.near > -0.01 && run.street.near < 0.12, `${w}: street: the near arm draws over the body (${run.street.near} covered)`);
     assert.ok(run.street.far > 0.2, `${w}: street: the far arm is behind the body (${run.street.far} covered)`);
     assert.ok(run.wall.far > 0.3, `${w}: wall: the far arm is behind the body and the building (${run.wall.far} covered)`);
     assert.ok(run.wall.hit >= 0 && run.wall.hit < 0.25, `${w}: wall: the smashing arm at its hit frame draws in front of everything but its own spark (${run.wall.hit} covered)`);
