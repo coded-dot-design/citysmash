@@ -92,4 +92,3 @@ export const CITIES: City[] = [
   },
 ];
 export const NCITY = CITIES.length;
-export const cityAt = (id: string) => Math.max(0, CITIES.findIndex((c) => c.id === id));

@@ -79,7 +79,7 @@ const okTag = (s: unknown): s is string => {
 const clampI = (n: unknown, max: number, d: number) => (Number.isInteger(n) && (n as number) >= 0 && (n as number) < max ? (n as number) : d);
 /** Repair a partial or out-of-range save; a look part you don't own falls back to the start's. */
 export function normalize(p: any): Profile {
-  const f = fresh(), ids = CITIES.map((c) => c.id), l = p.look ?? {};
+  const ids = CITIES.map((c) => c.id), l = p.look ?? {};
   const owned = [...new Set([...BASE, ...(Array.isArray(p.owned) ? p.owned.filter(okTag) : [])])];
   const has = (k: Part, i: number) => owned.includes(`${k}:${i}`);
   const pick = (k: Exclude<Part, "gear">, d: number) => { const i = clampI(l[k], KINDS[k], d); return has(k, i) ? i : d; };
@@ -98,7 +98,6 @@ export function normalize(p: any): Profile {
     rlook: RLOOK0.map((d, j) => { const v = Array.isArray(p.rlook) ? p.rlook[j] : d, c: Part = j & 1 ? "trim" : "fur", n = j & 1 ? TRIMS.length : FURS.length; return Number.isInteger(v) && v >= 0 && v < n && has(c, v) ? v : -1; }),
     stats: { runs: num(p.stats?.runs), buildings: num(p.stats?.buildings), snacks: num(p.stats?.snacks), helis: num(p.stats?.helis) },
   };
-  void f;
 }
 /** Load: a fresh profile when there is none or it is garbage; `newer` when a newer game wrote it (then it is never written over). */
 export function load(s: Store = local): { profile: Profile; newer: boolean } {

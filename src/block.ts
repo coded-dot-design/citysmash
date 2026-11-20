@@ -153,16 +153,6 @@ export function createBlock(h: Hooks) {
     if (B[b * 6] === STAND && B[b * 6 + 1]! >= NEED[b]!) (B[b * 6] = SHAKE), (B[b * 6 + 2] = SHAKE_T), h.emit(E_SHAKE, b);
     return true;
   }
-  /** The first window on floor fl of building b that is not a hole yet, from the near edge in; −1 when gone through. */
-  function rowTarget(b: number, fl: number, fromLeft: boolean) {
-    const w = BLD[b * 4 + 1]!;
-    if (fl < B[b * 6 + 3]! || fl >= BLD[b * 4 + 2]!) return -1;
-    for (let k = 0; k < w; k++) {
-      const i = C0[b]! + fl * w + (fromLeft ? k : w - 1 - k);
-      if (cell[i] !== HOLE) return i;
-    }
-    return -1;
-  }
   function step(dt: number) {
     for (let i = 0; i < L[1]!; i++) if (crackT[i]! > 0) crackT[i] = Math.max(0, crackT[i]! - dt);
     for (let b = 0; b < nb(); b++) {
@@ -203,7 +193,7 @@ export function createBlock(h: Hooks) {
     BLD, L, C0, LIVE, ANT, NEED, LH, HIT, cell, occ, ocT, crackT, B,
     /** Every view of the block's state (the round adds them to its own). */
     bytes: [BLD, L, C0, LIVE, ANT, NEED, LH, HIT, cell, occ, ocT, crackT, B].map((v) => new Uint8Array(v.buffer, v.byteOffset, v.byteLength)),
-    nb, top, yOff, standing, wallX, rowOf, bOf, layout, reset, strike, rowTarget, step,
+    nb, top, yOff, standing, wallX, rowOf, bOf, layout, reset, strike, step,
   };
 }
 export type Block = ReturnType<typeof createBlock>;

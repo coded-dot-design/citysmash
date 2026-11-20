@@ -11,7 +11,7 @@
 // helicopters; then the city's feature (a gunboat, a train, floodlights, surges, trucks, neon, two
 // helicopters). Deterministic: one seeded random in the state, fixed inputs → the same run; every
 // number in typed arrays (`bytes`: the rollback saves and restores them); zero allocation per step.
-import { createBlock, STAND, FALL, RUBBLE, HOLE, STREET0, STREET1, E_CHIP, E_CRACK, type Block } from "./block.ts";
+import { createBlock, STAND, RUBBLE, HOLE, STREET0, STREET1, E_CHIP, E_CRACK, type Block } from "./block.ts";
 import { createClimber, WALK, AIR, CLIMB, ROOF, KO, ZS, HAND, CLIMB_TOP, G, OUT, IN, WAIT, E_LEAP, LEAP_TAP } from "./climber.ts";
 import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, SKYPORT } from "./cities.ts";
 
@@ -223,7 +223,7 @@ export function createRun(seed = 20261116) {
   });
   const { BLD, C0, LIVE, ANT, B, cell, occ, ocT } = bk;
   const cl = createClimber(bk, { emit, landed: stomp });
-  const { standing, top, yOff, wallX, rowOf, rowTarget } = bk;
+  const { standing, top, yOff, wallX, rowOf } = bk;
   const nb = () => bk.L[0]!;
   const SXv = () => bk.L[3]!;
   const city = () => CITIES[S[16]!]!;
@@ -236,8 +236,8 @@ export function createRun(seed = 20261116) {
     cell, occ, B, BLD, C0, LIVE, ANT, crackT: bk.crackT, HIT: bk.HIT,
     /** Every view of the run's state: saved, restored and hashed byte for byte. */
     bytes: [] as Uint8Array[],
-    reset, step, clear, autopilot, autopilotOwn, join, setCur, humans, loadCity, top, yOff, standing, wallX, rowOf, sideTarget, nb, city,
-    levelRow, reachCell, reachCount, inReach, grabCell, grabCount, inGrab, winAt, lowCell, GC, powerReach, tankReach, groundReach,
+    reset, step, clear, autopilot, autopilotOwn, join, setCur, humans, loadCity, top, yOff, standing, wallX, rowOf, nb, city,
+    levelRow, reachCell, reachCount, grabCell, grabCount, inGrab, winAt, lowCell, GC, powerReach, tankReach, groundReach,
     get SX() {
       return SXv();
     },
@@ -422,13 +422,6 @@ export function createRun(seed = 20261116) {
     else if (md === ROOF) (M[16] = M[0]! + f * 2), (M[17] = M[1]! + 2.4);
     else (M[16] = M[0]! + f * 1.95), (M[17] = M[1]! + 1.6);
   }
-  /** The one window a punch from the wall hits now: on the floor at the hand (d 0), the one above (1) or
-   *  below (−1), the first window that is not a hole yet from the wall in; −1 when that floor is gone through. */
-  function sideTarget(d: number) {
-    const b = M[12]!, s = M[22]!;
-    if (b < 0 || !standing(b)) return -1;
-    return rowTarget(b, Math.floor(M[1]! + HAND - yOff(b)) + d, s < 0);
-  }
   /** The floor level with monster O's hand on the wall it hangs on (clamped to the floors still up), or −1. */
   function levelRow(O: Float64Array) {
     const b = O[12]!;
@@ -448,17 +441,6 @@ export function createRun(seed = 20261116) {
     let n = 0;
     for (let c = 0; c < NR; c++) if (reachCell(O, c) >= 0) n++;
     return n;
-  }
-  /** Is (x, y) in monster O's reach? On a wall: the reach cells' span (three rows, its own edge to three
-   *  windows in, and the gap it hangs in); elsewhere: by the fist. */
-  function inReach(O: Float64Array, x: number, y: number) {
-    const r = levelRow(O);
-    if (r >= 0) {
-      const b = O[12]!, s = O[22]!, edge = s < 0 ? BLD[b * 4]! : BLD[b * 4]! + BLD[b * 4 + 1]!, u = (x - edge) * -s, y0 = yOff(b) + r;
-      return u > -1.8 && u < 3.2 && y > y0 - 1.3 && y < y0 + 2.3;
-    }
-    const md = O[5]!, f = O[6]!, fx = O[0]! + f * (md === ROOF ? 2 : 1.95), fy = O[1]! + (md === ROOF ? 2.4 : 1.6);
-    return Math.abs(x - fx) < 2.6 && Math.abs(y - fy) < 2.6;
   }
   /** Grab cell g's centre (in the world) for monster O into GC (./GRAB about its own cell: on a wall half a
    *  window out from the edge it holds, level with the floor at its hand; elsewhere at its hand). */
@@ -1531,7 +1513,6 @@ export function createRun(seed = 20261116) {
     }
     return -1;
   }
-  void [FALL, RUBBLE, STREET1];
 
   MV[0]![28] = 0;
   for (let k = 1; k < NM; k++) MV[k]![28] = AI;

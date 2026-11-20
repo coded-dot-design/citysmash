@@ -12,7 +12,7 @@
 import type { Diorama, DioramaObject } from "@fzlt/core/diorama";
 import { AIR, CLIMB, ROOF, KO, MK } from "./climber.ts";
 import { DEPTH } from "./block.ts";
-import { HERO, CRAB, BLOB, MOTH, PUNCH_CD, PUNCH_HIT, POWER_CD, POWER_HIT } from "./round.ts";
+import { HERO, CRAB, MOTH, PUNCH_CD, PUNCH_HIT, POWER_CD, POWER_HIT } from "./round.ts";
 
 /** The hero's fur, with the word its name takes. */
 export const FURS = [
@@ -234,7 +234,6 @@ export function buildMonster(d: Diorama, kind: number, look: Look, K: RigInk, id
     // Six legs.
     for (let k = 0; k < 6; k++) {
       const s = k < 3 ? -1 : 1, x = -0.65 + (k % 3) * 0.6, h = grp("hip" + k, "body", [x, 0.2, s * 0.8], [s * 0.6, 0, 0], s, 2);
-      void h;
       const lg = P("hip" + k, "box", [0.18, 1.3, 0.18], [0, -1.3, 0], dark);
       if (k === 2 || k === 5) feet.push(lg);
       legs.push(h);

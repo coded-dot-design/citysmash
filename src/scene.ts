@@ -19,14 +19,14 @@ import { person, sniper, soldier, cracks, bite, type Ink } from "./paint.ts";
 import { DEPTH, STREET0, STREET1, INTACT, CRACKED, HOLE, SHAKE, FALL, RUBBLE } from "./block.ts";
 import { HAND } from "./climber.ts";
 import {
-  createRun, NM, NS, NP, NCH, NH, NT, SEATS, AI, HERO, CRAB, IN, READY, RUN, CLEAR, DONE, CLIMB, ROOF, KO,
+  createRun, NM, NS, NP, NCH, NH, NT, SEATS, AI, HERO, IN, READY, RUN, CLEAR, DONE, CLIMB, ROOF, KO,
   E_START, E_HOLE, E_SHAKE, E_FLOOR, E_FLAT, E_HELI, E_HELI_CRASH, E_NOM, E_HURT, E_FLING, E_DROP, E_KO, E_END, E_STOMP, E_JUMP, E_LAND, E_CLIMB,
   E_SHOCK, E_TANK, E_BONK, E_BURN, E_JOIN, E_CHIP_, E_CRACK_, E_ARMOUR, E_TRAIN, E_BELLS, E_RAM, E_TRUCK, E_SURGE, E_CITY, E_CLEAR, E_PUNCH,
   E_POWER, E_KNOCKOFF, E_POUNCE, E_COMBO_HIT, E_TELL, T_RIVAL, T_RIVAL_END, DUMMY, T_TANK, TANK_HITS, TANK_ARMOUR, T_FOE, T_TRUCK, T_GROUND_END,
   NI, NR, NG, P_ALL, REACH, E_LEAP, LEVEL0, LEVELS, T_CELL, T_GRAB, T_HELI, T_CHUTE, T_SOLDIER, T_STREET, T_MISS, T_BACK, T_LOW, NLOW, isPunch,
   type Run,
 } from "./round.ts";
-import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, PLANT, BRIDGE, NEON, SKYPORT, DAY, DUSK, NIGHT, R_TANK, R_ANT, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
+import { CITIES, NCITY, HARBOUR, RAIL, STADIUM, BRIDGE, DAY, DUSK, NIGHT, R_TANK, R_DOME, R_BOARD, C_LIGHT, C_CLOCK, C_BOWL, C_COOL, C_PYLON, C_ARCADE, C_SPIRE, type City } from "./cities.ts";
 import { buildMonster, monName, shade, WALL, TRIMS, HELD, type Look, type Monster, type RigInk } from "./monster.ts";
 
 const TAU = 6.283185307179586;
@@ -438,7 +438,6 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
   /** The landmark's crown on its roof. */
   function crown(cty: City, R: (s: number[], p: number[], col: string, o?: { shape?: "box" | "cyl" | "wedge" | "prism"; sides?: number; top?: number; emissive?: boolean; rot?: number[] }) => DioramaObject, w: number, f: number) {
     const m = P.walls[5]!, acc = P.awning[(cty.crown + 1) % 5]!, k = cty.crown;
-    void f;
     if (k === C_LIGHT) {
       R([w * 0.62, 1.1, 1.6], [0, 0.1, 0], m, { shape: "cyl", sides: 10 });
       R([w * 0.55, 0.12, 1.5], [0, 1.2, 0], P.ink, { shape: "cyl", sides: 10 });
@@ -2344,4 +2343,3 @@ export function mountScene(stage: HTMLElement, so: SceneOptions) {
     destroy: () => engine.destroy(),
   };
 }
-void [E_CLIMB, CRAB, NIGHT, R_ANT, C_SPIRE, PLANT, NEON, SKYPORT, BRIDGE];
