@@ -1,0 +1,73 @@
+/* The garage as a store (./store.ts) on the shop kit (../vendor/shop/shop.css: its tokens, its keys, its
+   tabs, its turntable frame). This file is the layout only: the whole store inside the stage (no page
+   scroll; the list alone scrolls if a short stage cannot hold it), 1440 px at most, the turntable
+   anchored top-left at one size on every tab. Sized by the stage (a container), not the window: the
+   game also mounts in a box on a page. */
+.cs .cs-cards{container:cards/size}
+.bui .cs .cs-cards.shop{overflow:hidden;background:var(--shop-bg)}
+.cs .cs-garage{box-sizing:border-box;height:100%;max-width:1440px;margin:0 auto;padding:12px 16px;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px;color:var(--shop-ink);font-weight:700}
+.cs .cs-sbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
+.cs .cs-sbar>div{display:flex;align-items:center;gap:10px;min-width:0}
+.cs .cs-sbar>div:last-child{justify-content:flex-end}
+.cs .cs-sbar h2{font-size:22px;letter-spacing:.06em}
+.cs .cs-prog{display:grid;justify-items:center;gap:5px;margin:0;min-width:0}
+.cs .cs-prog .shop-meta{max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cs .cs-gbody{min-height:0;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:16px}
+.cs .cs-gview{min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:10px}
+.cs .cs-gview .shop-turn{min-height:0;overflow:hidden;border:1.5px solid var(--shop-line);border-radius:var(--shop-r);background:var(--shop-panel)}
+.cs .cs-pvwrap{position:absolute;inset:0}
+.cs .cs-preview{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+.cs .cs-gview .shop-turn .cs-mname{position:absolute;left:10px;top:10px;padding:4px 9px;border-radius:4px;background:var(--shop-panel);color:var(--shop-ink);font-size:14px;pointer-events:none}
+.cs .cs-gside{min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:10px}
+.cs .cs-gside .shop-tabs{flex-wrap:nowrap;gap:4px 28px}
+.cs .cs-gside .shop-tab{min-width:44px}
+.cs .cs-panel{min-height:0;overflow:auto;overscroll-behavior:contain;display:grid;align-content:start;gap:10px;padding:2px 3px 4px;touch-action:pan-y}
+.cs .cs-panel .shop-h3{font-size:14px;letter-spacing:.08em;color:var(--shop-mute)}
+.cs .cs-grid{display:grid;grid-template-columns:repeat(var(--cols,6),minmax(0,1fr));gap:8px}
+.cs .cs-rail{--cols:4}
+.cs .cs-cell{position:relative;display:grid;min-width:0}
+.cs .cs-tile{display:grid;align-content:start;gap:5px;padding:8px;min-height:44px;font-size:13px;line-height:1.15;overflow-wrap:anywhere}
+.cs .cs-tile .shop-swatch{height:22px;border-radius:5px;border:1.5px solid var(--shop-line2);box-sizing:border-box}
+.cs .cs-tile .shop-badge{width:28px;height:22px;border-radius:5px}
+.cs .cs-cost{display:flex;align-items:center;gap:4px;font:600 11px/1.2 var(--shop-mono);letter-spacing:.04em;color:var(--shop-mute)}
+.cs .cs-cost[data-locked]{color:var(--shop-price)}
+.cs .cs-tile[data-locked]{border-style:dashed;box-shadow:none}
+.cs .cs-tile[data-locked] :is(.shop-swatch,.shop-badge){opacity:.5}
+.cs .cs-tile[data-pick]{cursor:pointer}
+.cs .cs-cell .shop-corner{top:9px}
+.cs .cs-foot{display:flex;align-items:center;gap:10px;min-height:44px;margin:0}
+.cs .cs-foot .cs-note{padding:.45em .7em;font-size:13px}
+.cs .cs-foot .shop-btn{margin-left:auto}
+.cs .cs-code{display:grid;gap:8px;font-size:14px}
+.cs .cs-code textarea{font:600 12px/1.3 var(--shop-mono);padding:.5em;border:1.5px solid var(--shop-line2);border-radius:8px;background:var(--shop-tile);color:var(--shop-ink);resize:none;word-break:break-all}
+.cs .cs-code .shop-btn{justify-self:start}
+@container cards (max-width:900px){
+.cs .cs-grid{--cols:4}
+.cs .cs-gside .shop-tabs{gap:4px 16px}
+.cs .cs-gside .shop-tab{font-size:14px}
+.cs .cs-sbar h2{display:none}
+}
+@container cards (max-width:600px){
+.cs .cs-garage{padding:8px 12px;gap:8px}
+.cs .cs-gbody{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:8px}
+.cs .cs-gview{grid-template-rows:auto auto;gap:8px}
+.cs .cs-gview .shop-turn{height:clamp(110px,27cqh,300px)}
+.cs .cs-gside{gap:6px}
+.cs .cs-gside .shop-tabs{gap:4px 14px;justify-content:space-between}
+.cs .cs-gside .shop-tab{font-size:13px}
+.cs .cs-gside .shop-tab .shop-i{display:none}
+.cs .cs-tile{padding:6px;gap:4px;font-size:11.5px}
+.cs .cs-tile .shop-swatch,.cs .cs-tile .shop-badge{height:18px}
+.cs .cs-rail .cs-tile b{font-size:10.5px}
+.cs .cs-cost{font-size:10px;letter-spacing:0}
+.cs .cs-cost .shop-i{position:absolute;top:8px;right:9px;width:13px;height:13px;padding:1px;border-radius:4px;background:var(--shop-panel)}
+.cs .cs-sbar{grid-template-columns:auto minmax(0,1fr) auto;gap:8px}
+.cs .cs-sbar>div{gap:8px}
+.cs .cs-sbar .shop-btn{padding:0 10px;font-size:15px}
+.cs .cs-sbar .cs-codek{font-size:0;gap:0;min-width:44px;padding:0}
+.cs .cs-sbar .cs-codek .shop-i{width:20px;height:20px}
+.cs .cs-prog .shop-stages{gap:4px}
+.cs .cs-prog .shop-stages i{width:7px;height:7px}
+.cs .cs-prog .shop-meta{font-size:10px}
+.cs .cs-prog .shop-meta span{display:none}
+}
